@@ -70,6 +70,12 @@ proc createCounterPlugin*(): PluginModule =
           var ctx = getContext[CounterState](api, pluginName)
           ctx.data.count = 0
           return true  # Event consumed
+      elif event.kind == TextEvent:
+        # Handle regular character input
+        if event.text == "r":
+          var ctx = getContext[CounterState](api, pluginName)
+          ctx.data.count = 0
+          return true  # Event consumed
       return false  # Event not handled
     ,
     

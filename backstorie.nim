@@ -554,6 +554,19 @@ proc disableMouseReporting() =
     stdout.write("\e[?1006l\e[?1000l")
     stdout.flushFile()
 
+proc enableKeyboardProtocol() =
+  when not defined(emscripten):
+    # Enable enhanced keyboard protocol (CSI u mode)
+    # This allows proper detection of key presses with modifiers
+    stdout.write("\e[>1u")
+    stdout.flushFile()
+
+proc disableKeyboardProtocol() =
+  when not defined(emscripten):
+    # Disable enhanced keyboard protocol
+    stdout.write("\e[<u")
+    stdout.flushFile()
+
 proc getTermSize(): (int, int) =
   when defined(emscripten):
     return (80, 24)
@@ -809,6 +822,12 @@ proc removeLayer*(state: AppState, id: string) =
     else:
       i += 1
 
+proc resizeLayers*(state: AppState, newWidth, newHeight: int) =
+  ## Resize all layer buffers to match new terminal size
+  for layer in state.layers:
+    layer.buffer = newTermBuffer(newWidth, newHeight)
+    layer.buffer.clearTransparent()
+
 proc compositeLayers*(state: AppState) =
   if state.layers.len == 0:
     return
@@ -974,8 +993,40 @@ when not defined(emscripten):
   var onShutdown*: proc(state: AppState) = nil
   var onInput*: proc(state: AppState, event: InputEvent): bool = nil
   
-  when fileExists("index.nim"):
-    include index
+  # Include user-specified file or default to index.nim at compile time
+  const userFileValue {.strdefine.}: string = "index"
+  
+  when userFileValue == "example_boxes":
+    when fileExists("example_boxes.nim"):
+      include example_boxes
+    else:
+      {.error: "example_boxes.nim not found".}
+  elif userFileValue == "example_simple_counter":
+    when fileExists("example_simple_counter.nim"):
+      include example_simple_counter
+    else:
+      {.error: "example_simple_counter.nim not found".}
+  elif userFileValue == "example_fadein":
+    when fileExists("example_fadein.nim"):
+      include example_fadein
+    else:
+      {.error: "example_fadein.nim not found".}
+  elif userFileValue == "example_events_plugin":
+    when fileExists("example_events_plugin.nim"):
+      include example_events_plugin
+    else:
+      {.error: "example_events_plugin.nim not found".}
+  elif userFileValue == "example_core_events":
+    when fileExists("example_core_events.nim"):
+      include example_core_events
+    else:
+      {.error: "example_core_events.nim not found".}
+  else:
+    # Default to index.nim
+    when fileExists("index.nim"):
+      include index
+    else:
+      {.error: "index.nim not found. Create index.nim or specify a valid file with -d:userFile=<filename>".}
   
   proc callOnSetup(state: AppState) =
     if not onInit.isNil:
@@ -1040,21 +1091,46 @@ when defined(emscripten):
     globalState.currentBuffer = newTermBuffer(width, height)
     globalState.previousBuffer = newTermBuffer(width, height)
 
+proc showHelp() =
+  echo "backstorie v" & version
+  echo "Terminal engine with sophisticated input parsing"
+  echo ""
+  echo "Usage: nim c -r backstorie.nim [OPTIONS]"
+  echo "       nim c -r -d:userFile=<file> backstorie.nim [OPTIONS]"
+  echo ""
+  echo "Options:"
+  echo "  -h, --help            Show this help message"
+  echo "  -v, --version         Show version information"
+  echo ""
+  echo "Compile-time defines:"
+  echo "  -d:userFile=FILE      Nim file to include (default: index.nim)"
+  echo ""
+  echo "Examples:"
+  echo "  nim c -r backstorie.nim                              # Run with index.nim"
+  echo "  nim c -r -d:userFile=example_boxes backstorie.nim    # Run example_boxes.nim"
+  echo "  nim c -r -d:userFile=plugins/simple_counter backstorie.nim"
+
 proc main() =
   var p = initOptParser()
+  
   for kind, key, val in p.getopt():
     case kind
     of cmdLongOption, cmdShortOption:
       case key
       of "help", "h":
-        echo "backstorie v" & version
-        echo "Terminal engine with sophisticated input parsing"
+        showHelp()
         quit(0)
       of "version", "v":
         echo "backstorie version " & version
         quit(0)
-      else: discard
-    of cmdArgument: discard
+      else:
+        echo "Unknown option: " & key
+        echo "Use --help for usage information"
+        quit(1)
+    of cmdArgument:
+      echo "Unexpected argument: " & key
+      echo "Note: To run a custom file, use: nim c -r -d:userFile=<file> backstorie.nim"
+      quit(1)
     else: discard
   
   when not defined(emscripten):
@@ -1069,6 +1145,7 @@ proc main() =
     setupRawMode()
     hideCursor()
     enableMouseReporting()
+    enableKeyboardProtocol()
     
     signal(SIGINT, proc(sig: cint) {.noconv.} = globalRunning = false)
     signal(SIGTERM, proc(sig: cint) {.noconv.} = globalRunning = false)
@@ -1101,6 +1178,7 @@ proc main() =
             state.termHeight = event.newHeight
             state.currentBuffer = newTermBuffer(event.newWidth, event.newHeight)
             state.previousBuffer = newTermBuffer(event.newWidth, event.newHeight)
+            state.resizeLayers(event.newWidth, event.newHeight)
             stdout.write("\e[2J\e[H")
             stdout.flushFile()
           else:
@@ -1113,6 +1191,7 @@ proc main() =
           state.termHeight = newH
           state.currentBuffer = newTermBuffer(newW, newH)
           state.previousBuffer = newTermBuffer(newW, newH)
+          state.resizeLayers(newW, newH)
           stdout.write("\e[2J\e[H")
           stdout.flushFile()
         
@@ -1145,6 +1224,7 @@ proc main() =
     finally:
       shutdownPlugins(state)
       callOnShutdown(state)
+      disableKeyboardProtocol()
       disableMouseReporting()
       restoreTerminal()
 

@@ -32,6 +32,11 @@ onInput = proc(state: AppState, event: InputEvent): bool =
     if event.keyCode == ord('q'):
       state.running = false
       return true
+  elif event.kind == TextEvent:
+    # Handle regular character input
+    if event.text == "q":
+      state.running = false
+      return true
   return false
 
 onShutdown = proc(state: AppState) =
