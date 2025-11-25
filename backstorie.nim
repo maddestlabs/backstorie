@@ -994,29 +994,31 @@ when not defined(emscripten):
   var onInput*: proc(state: AppState, event: InputEvent): bool = nil
   
   # Include user-specified file or default to index.nim at compile time
-  const userFileValue {.strdefine.}: string = "index"
+  # To run a specific file, use: ./run.sh <filename>
+  # Or compile with: nim c -d:userFile="filename" backstorie.nim
+  const userFile {.strdefine.} = "index"
   
-  when userFileValue == "example_boxes":
+  when userFile == "example_boxes":
     when fileExists("example_boxes.nim"):
       include example_boxes
     else:
       {.error: "example_boxes.nim not found".}
-  elif userFileValue == "example_simple_counter":
+  elif userFile == "example_simple_counter":
     when fileExists("example_simple_counter.nim"):
       include example_simple_counter
     else:
       {.error: "example_simple_counter.nim not found".}
-  elif userFileValue == "example_fadein":
+  elif userFile == "example_fadein":
     when fileExists("example_fadein.nim"):
       include example_fadein
     else:
       {.error: "example_fadein.nim not found".}
-  elif userFileValue == "example_events_plugin":
+  elif userFile == "example_events_plugin":
     when fileExists("example_events_plugin.nim"):
       include example_events_plugin
     else:
       {.error: "example_events_plugin.nim not found".}
-  elif userFileValue == "example_core_events":
+  elif userFile == "example_core_events":
     when fileExists("example_core_events.nim"):
       include example_core_events
     else:
@@ -1095,20 +1097,21 @@ proc showHelp() =
   echo "backstorie v" & version
   echo "Terminal engine with sophisticated input parsing"
   echo ""
-  echo "Usage: nim c -r backstorie.nim [OPTIONS]"
-  echo "       nim c -r -d:userFile=<file> backstorie.nim [OPTIONS]"
+  echo "Usage: Use the run.sh script (recommended)"
+  echo "       ./run.sh [OPTIONS] [FILE]"
+  echo ""
+  echo "Or compile directly:"
+  echo "       nim c -r backstorie.nim [OPTIONS]"
   echo ""
   echo "Options:"
   echo "  -h, --help            Show this help message"
   echo "  -v, --version         Show version information"
   echo ""
-  echo "Compile-time defines:"
-  echo "  -d:userFile=FILE      Nim file to include (default: index.nim)"
-  echo ""
   echo "Examples:"
-  echo "  nim c -r backstorie.nim                              # Run with index.nim"
-  echo "  nim c -r -d:userFile=example_boxes backstorie.nim    # Run example_boxes.nim"
-  echo "  nim c -r -d:userFile=plugins/simple_counter backstorie.nim"
+  echo "  ./run.sh example_boxes              # Run example_boxes.nim"
+  echo "  ./run.sh                            # Run default index.nim"
+  echo ""
+  echo "Note: To specify a file at compile time, add it to the include list in backstorie.nim"
 
 proc main() =
   var p = initOptParser()

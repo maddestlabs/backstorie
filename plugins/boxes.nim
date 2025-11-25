@@ -8,7 +8,7 @@
 ## - Handle events to change display options
 
 import ../plugin_interface
-import tables
+import tables, strutils
 
 # ================================================================
 # PLUGIN STATE (type-safe)

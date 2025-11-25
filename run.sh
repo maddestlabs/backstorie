@@ -87,9 +87,10 @@ if [ ! -f "${FILE_BASE}.nim" ]; then
     exit 1
 fi
 
-# Compile
+# Compile with userFile define
 echo "Compiling backstorie with ${FILE_BASE}.nim..."
-nim c $RELEASE_MODE -d:userFile="$FILE_BASE" backstorie.nim
+nim c $RELEASE_MODE -d:userFile="$FILE_BASE" backstorie.nim || \
+  (echo "Compilation failed. Make sure ${FILE_BASE}.nim is added to the include list in backstorie.nim" && exit 1)
 
 if [ $? -ne 0 ]; then
     echo "Compilation failed!"
