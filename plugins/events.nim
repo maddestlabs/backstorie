@@ -355,20 +355,20 @@ proc createEventHandlerPlugin*(handler: TerminalEventHandler): PluginModule =
   PluginModule(
     name: "terminalEventHandler",
     
-    initProc: proc(state: var AppState) {.nimcall.} =
+    initProc: proc(api: PluginAPI) {.nimcall.} =
       globalHandler.debugLog("Event handler initialized"),
     
-    updateProc: proc(state: var AppState, dt: float) {.nimcall.} =
+    updateProc: proc(api: PluginAPI, dt: float) {.nimcall.} =
       # Update could track key repeat timeouts, double-click detection, etc.
       discard,
     
-    renderProc: proc(state: var AppState) {.nimcall.} =
+    renderProc: proc(api: PluginAPI) {.nimcall.} =
       discard,
     
-    handleEventProc: proc(state: var AppState, event: InputEvent): bool {.nimcall.} =
+    handleEventProc: proc(api: PluginAPI, event: InputEvent): bool {.nimcall.} =
       return dispatchEvent(globalHandler, event),
     
-    shutdownProc: proc(state: var AppState) {.nimcall.} =
+    shutdownProc: proc(api: PluginAPI) {.nimcall.} =
       globalHandler.debugLog("Event handler shutdown")
   )
 
