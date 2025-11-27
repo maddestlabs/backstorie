@@ -1,0 +1,25 @@
+# Nim compiler artifacts
+nimcache/
+nimcache_wasm/
+*.exe
+*.out
+backstorie
+
+# WASM build artifacts (keep only source files in web/)
+web/backstorie.wasm
+web/backstorie.wasm.js
+web/backstorie.wasm.wasm
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Logs
+*.log

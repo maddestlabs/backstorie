@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backstorie - Terminal Engine</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: 'Courier New', 'Consolas', monospace;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        #terminal {
+            display: block;
+            background: #000;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        
+        #loading {
+            position: absolute;
+            color: #0f0;
+            font-size: 16px;
+            text-align: center;
+            z-index: 10;
+        }
+        
+        #loading.hidden {
+            display: none;
+        }
+        
+        .error {
+            color: #f00;
+            background: #300;
+            padding: 20px;
+            border: 2px solid #f00;
+            max-width: 600px;
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="loading">
+            <div>Loading Backstorie...</div>
+            <div id="progress"></div>
+        </div>
+        <canvas id="terminal" tabindex="0"></canvas>
+    </div>
+    
+    <script src="backstorie.js"></script>
+    <script>
+        const canvas = document.getElementById('terminal');
+        const loading = document.getElementById('loading');
+        const progress = document.getElementById('progress');
+        const container = document.getElementById('container');
+        
+        let Module = {
+            canvas: canvas,
+            print: function(text) {
+                console.log(text);
+            },
+            printErr: function(text) {
+                console.error(text);
+            },
+            setStatus: function(text) {
+                if (text) {
+                    progress.textContent = text;
+                } else {
+                    loading.classList.add('hidden');
+                }
+            },
+            onRuntimeInitialized: function() {
+                initBackstorie();
+            }
+        };
+        
+        // Load the WASM module
+        const script = document.createElement('script');
+        script.src = 'backstorie.wasm.js';
+        script.onerror = function() {
+            container.innerHTML = '<div class="error"><h2>Failed to load WASM module</h2><p>Make sure backstorie.wasm.js exists in the same directory.</p></div>';
+        };
+        document.body.appendChild(script);
+    </script>
+</body>
+</html>

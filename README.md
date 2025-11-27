@@ -1,9 +1,11 @@
 # backstorie
-Core Nim-based engine for building terminal apps and games.
+Core Nim-based engine for building terminal apps and games, with support for both native and WebAssembly targets.
 
 ## Quick Start
 
-### Using the Run Script (Recommended)
+### Native Terminal Apps
+
+#### Using the Run Script (Recommended)
 
 The easiest way to run backstorie with different example files:
 
@@ -25,7 +27,7 @@ The easiest way to run backstorie with different example files:
 ./run.sh --help
 ```
 
-### Direct Compilation
+#### Direct Compilation
 
 You can also compile directly with nim:
 
@@ -40,30 +42,61 @@ nim c -r -d:userFile=example_boxes backstorie.nim
 nim c -r backstorie.nim --help
 ```
 
+### WebAssembly (Browser)
+
+Compile your Backstorie apps to run in the browser:
+
+```bash
+# Compile to WASM
+./compile_wasm.sh example_boxes
+
+# Compile and serve locally
+./compile_wasm.sh -s example_boxes
+```
+
+See [WASM_GUIDE.md](WASM_GUIDE.md) for detailed instructions on:
+- Setting up Emscripten
+- Compiling to WebAssembly
+- Deploying to web servers
+- Browser-specific features and limitations
+
 ## Creating Your Own App
 
 1. Create a `.nim` file (e.g., `myapp.nim`)
-2. Import plugins and define callbacks:
+2. Optionally import helper libraries and define callbacks:
 
 ```nim
-import plugins/simple_counter
+# Import helper libraries (optional)
+import lib/events
+import lib/ui_components
+import lib/animation
+
+# Create your app state
+var myText = "Hello, World!"
+var myAnimation = newAnimation(2.0, loop = true)
 
 onInit = proc(state: AppState) =
-  state.registerPlugin(createCounterPlugin())
+  # Initialize your app
+  echo "App started!"
 
 onUpdate = proc(state: AppState, dt: float) =
-  discard
+  # Update animations, game logic, etc.
+  myAnimation.update(dt)
 
 onRender = proc(state: AppState) =
-  # Your rendering code here
-  discard
+  # Draw using helper functions or directly
+  drawBox(state, 10, 5, 40, 10, defaultStyle(), "My App")
+  state.currentBuffer.writeText(12, 7, myText, defaultStyle())
 
 onInput = proc(state: AppState, event: InputEvent): bool =
   # Handle input events
+  if event.kind == KeyEvent and event.keyCode == ord('q'):
+    state.running = false
+    return true
   return false
 
 onShutdown = proc(state: AppState) =
-  discard
+  echo "App shutting down"
 ```
 
 3. Run it:
@@ -80,17 +113,30 @@ nim c -r -d:userFile=myapp backstorie.nim
 
 ## Available Examples
 
-- `index.nim` - Default simple counter demo
-- `example_boxes.nim` - Border box that auto-resizes with terminal (demonstrates terminal resize handling)
-- `example_simple_counter.nim` - Basic frame counter
+- `index.nim` - Default simple demo
+- `example_boxes.nim` - Animated bouncing boxes with layers
+- `example_counter.nim` - Basic frame counter
 - `example_fadein.nim` - Fade-in animation example
-- `example_events_plugin.nim` - Event system demo
+- `example_particles.nim` - Particle system demo
 - `example_core_events.nim` - Core event handling demo
+- `example_advanced_events.nim` - Advanced event system usage
+- `example_wasm_test.nim` - WASM/browser compatibility test
+
+## Helper Libraries
+
+- `lib/events.nim` - Robust event handling with callbacks
+- `lib/animation.nim` - Easing functions, interpolation, particles
+- `lib/ui_components.nim` - Reusable UI elements (boxes, buttons, progress bars)
+
+See [LIBRARY_GUIDE.md](LIBRARY_GUIDE.md) for detailed usage instructions and examples.
 
 ## Features
 
-- **Automatic Terminal Resize Handling** - All layers automatically resize when the terminal size changes
-- **Plugin Architecture** - Modular design with type-safe plugin system
+- **Cross-Platform** - Runs natively in terminals and in web browsers via WebAssembly
+- **Automatic Terminal Resize Handling** - All layers automatically resize when the terminal or browser window changes size
+- **Direct Callback Architecture** - Simple onInit/onUpdate/onRender callback system
+- **Reusable Libraries** - Helper modules for events, animations, and UI components
 - **Layer System** - Z-ordered layers with transparency support
 - **Input Handling** - Comprehensive keyboard, mouse, and special key support
 - **Color Support** - True color (24-bit), 256-color, and 8-color terminal support
+- **Canvas Rendering** - Hardware-accelerated rendering in browser via HTML5 canvas

@@ -137,9 +137,9 @@ const
   INTERMED_MAX = 16
   CSI_ARGS_MAX = 16
   CSI_LEADER_MAX = 16
-  CSI_ARG_FLAG_MORE* = (1'u32 shl 31).int
-  CSI_ARG_MASK* = (not (1'u32 shl 31)).int
-  CSI_ARG_MISSING* = ((1'u32 shl 31) - 1).int
+  CSI_ARG_FLAG_MORE* = int(0x80000000'u32)
+  CSI_ARG_MASK* = int(0x7FFFFFFF'u32)
+  CSI_ARG_MISSING* = int(0x7FFFFFFF'u32)
 
 type
   StringCsiState = object
@@ -181,8 +181,8 @@ proc newTerminalInputParser*(): TerminalInputParser =
   result.escapeTimeout = 300
   result.escTimer = epochTime()
 
-proc csiArg(a: int64): int = a.int and CSI_ARG_MASK
-proc csiArgHasMore(a: int64): bool = (a.int and CSI_ARG_FLAG_MORE) != 0
+proc csiArg(a: int64): int = int(a) and CSI_ARG_MASK
+proc csiArgHasMore(a: int64): bool = (int(a) and CSI_ARG_FLAG_MORE) != 0
 proc csiArgIsMissing(a: int64): bool = csiArg(a) == CSI_ARG_MISSING
 
 proc csiArgOr(a: int64, def: int): int =
@@ -1010,6 +1010,24 @@ when not defined(emscripten):
 
 when defined(emscripten):
   var globalState: AppState
+  var onInit*: proc(state: AppState) = nil
+  var onUpdate*: proc(state: AppState, dt: float) = nil
+  var onRender*: proc(state: AppState) = nil
+  var onShutdown*: proc(state: AppState) = nil
+  var onInput*: proc(state: AppState, event: InputEvent): bool = nil
+  
+  # Include user-specified file or default to index.nim at compile time
+  const userFile {.strdefine.} = "index"
+  
+  # Macro to dynamically include file based on compile-time string
+  macro includeUserFile(filename: static[string]): untyped =
+    let file = if filename.endsWith(".nim"): filename else: filename & ".nim"
+    if not fileExists(file):
+      error("File not found: " & file & ". Create the file or specify a different one with -d:userFile=<filename>")
+    result = newNimNode(nnkIncludeStmt)
+    result.add(newIdentNode(file.replace(".nim", "")))
+  
+  includeUserFile(userFile)
   
   proc emInit(width, height: int) {.exportc.} =
     globalState = new(AppState)
@@ -1017,11 +1035,16 @@ when defined(emscripten):
     globalState.termHeight = height
     globalState.currentBuffer = newTermBuffer(width, height)
     globalState.previousBuffer = newTermBuffer(width, height)
-    globalState.colorSupport = detectColorSupport()
+    globalState.colorSupport = 16777216  # Full RGB support in browser
     globalState.running = true
     globalState.layers = @[]
     globalState.targetFps = 60.0
     globalState.inputParser = newTerminalInputParser()
+    globalState.lastMouseX = 0
+    globalState.lastMouseY = 0
+    
+    if not onInit.isNil:
+      onInit(globalState)
   
   proc emUpdate(deltaMs: float) {.exportc.} =
     let dt = deltaMs / 1000.0
@@ -1032,7 +1055,14 @@ when defined(emscripten):
       globalState.fps = 1.0 / dt
       globalState.lastFpsUpdate = globalState.totalTime
     
+    if not onUpdate.isNil:
+      onUpdate(globalState, dt)
+    
     swap(globalState.currentBuffer, globalState.previousBuffer)
+    
+    if not onRender.isNil:
+      onRender(globalState)
+    
     compositeLayers(globalState)
   
   proc emResize(width, height: int) {.exportc.} =
@@ -1040,6 +1070,115 @@ when defined(emscripten):
     globalState.termHeight = height
     globalState.currentBuffer = newTermBuffer(width, height)
     globalState.previousBuffer = newTermBuffer(width, height)
+    resizeLayers(globalState, width, height)
+  
+  proc emGetCell(x, y: int): cstring {.exportc.} =
+    if x >= 0 and x < globalState.currentBuffer.width and 
+       y >= 0 and y < globalState.currentBuffer.height:
+      let idx = y * globalState.currentBuffer.width + x
+      return cstring(globalState.currentBuffer.cells[idx].ch)
+    return cstring("")
+  
+  proc emGetCellFgR(x, y: int): int {.exportc.} =
+    if x >= 0 and x < globalState.currentBuffer.width and 
+       y >= 0 and y < globalState.currentBuffer.height:
+      let idx = y * globalState.currentBuffer.width + x
+      return globalState.currentBuffer.cells[idx].style.fg.r.int
+    return 255
+  
+  proc emGetCellFgG(x, y: int): int {.exportc.} =
+    if x >= 0 and x < globalState.currentBuffer.width and 
+       y >= 0 and y < globalState.currentBuffer.height:
+      let idx = y * globalState.currentBuffer.width + x
+      return globalState.currentBuffer.cells[idx].style.fg.g.int
+    return 255
+  
+  proc emGetCellFgB(x, y: int): int {.exportc.} =
+    if x >= 0 and x < globalState.currentBuffer.width and 
+       y >= 0 and y < globalState.currentBuffer.height:
+      let idx = y * globalState.currentBuffer.width + x
+      return globalState.currentBuffer.cells[idx].style.fg.b.int
+    return 255
+  
+  proc emGetCellBgR(x, y: int): int {.exportc.} =
+    if x >= 0 and x < globalState.currentBuffer.width and 
+       y >= 0 and y < globalState.currentBuffer.height:
+      let idx = y * globalState.currentBuffer.width + x
+      return globalState.currentBuffer.cells[idx].style.bg.r.int
+    return 0
+  
+  proc emGetCellBgG(x, y: int): int {.exportc.} =
+    if x >= 0 and x < globalState.currentBuffer.width and 
+       y >= 0 and y < globalState.currentBuffer.height:
+      let idx = y * globalState.currentBuffer.width + x
+      return globalState.currentBuffer.cells[idx].style.bg.g.int
+    return 0
+  
+  proc emGetCellBgB(x, y: int): int {.exportc.} =
+    if x >= 0 and x < globalState.currentBuffer.width and 
+       y >= 0 and y < globalState.currentBuffer.height:
+      let idx = y * globalState.currentBuffer.width + x
+      return globalState.currentBuffer.cells[idx].style.bg.b.int
+    return 0
+  
+  proc emGetCellBold(x, y: int): int {.exportc.} =
+    if x >= 0 and x < globalState.currentBuffer.width and 
+       y >= 0 and y < globalState.currentBuffer.height:
+      let idx = y * globalState.currentBuffer.width + x
+      return if globalState.currentBuffer.cells[idx].style.bold: 1 else: 0
+    return 0
+  
+  proc emGetCellItalic(x, y: int): int {.exportc.} =
+    if x >= 0 and x < globalState.currentBuffer.width and 
+       y >= 0 and y < globalState.currentBuffer.height:
+      let idx = y * globalState.currentBuffer.width + x
+      return if globalState.currentBuffer.cells[idx].style.italic: 1 else: 0
+    return 0
+  
+  proc emGetCellUnderline(x, y: int): int {.exportc.} =
+    if x >= 0 and x < globalState.currentBuffer.width and 
+       y >= 0 and y < globalState.currentBuffer.height:
+      let idx = y * globalState.currentBuffer.width + x
+      return if globalState.currentBuffer.cells[idx].style.underline: 1 else: 0
+    return 0
+  
+  proc emHandleKeyPress(keyCode: int, shift, alt, ctrl: int) {.exportc.} =
+    var mods: set[uint8] = {}
+    if shift != 0: mods.incl ModShift
+    if alt != 0: mods.incl ModAlt
+    if ctrl != 0: mods.incl ModCtrl
+    
+    let event = InputEvent(kind: KeyEvent, keyCode: keyCode, keyMods: mods, keyAction: Press)
+    if not onInput.isNil:
+      discard onInput(globalState, event)
+  
+  proc emHandleTextInput(text: cstring) {.exportc.} =
+    let event = InputEvent(kind: TextEvent, text: $text)
+    if not onInput.isNil:
+      discard onInput(globalState, event)
+  
+  proc emHandleMouseClick(x, y, button, shift, alt, ctrl: int) {.exportc.} =
+    var mods: set[uint8] = {}
+    if shift != 0: mods.incl ModShift
+    if alt != 0: mods.incl ModAlt
+    if ctrl != 0: mods.incl ModCtrl
+    
+    let mouseButton = case button
+      of 0: Left
+      of 1: Middle
+      of 2: Right
+      else: Unknown
+    
+    let event = InputEvent(kind: MouseEvent, button: mouseButton, mouseX: x, mouseY: y, mods: mods, action: Press)
+    if not onInput.isNil:
+      discard onInput(globalState, event)
+  
+  proc emHandleMouseMove(x, y: int) {.exportc.} =
+    globalState.lastMouseX = x
+    globalState.lastMouseY = y
+    let event = InputEvent(kind: MouseMoveEvent, moveX: x, moveY: y, moveMods: {})
+    if not onInput.isNil:
+      discard onInput(globalState, event)
 
 proc showHelp() =
   echo "backstorie v" & version

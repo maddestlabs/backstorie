@@ -78,13 +78,20 @@ else
     FILE_BASE="${USER_FILE%.nim}"
 fi
 
-# Check if file exists
+# Check if file exists, try examples/ directory if not found in current location
 if [ ! -f "${FILE_BASE}.nim" ]; then
-    echo "Error: File not found: ${FILE_BASE}.nim"
-    if [ -z "$USER_FILE" ]; then
-        echo "Hint: Create an index.nim file or specify a different file to run"
+    if [ ! -z "$USER_FILE" ] && [ -f "examples/${FILE_BASE}.nim" ]; then
+        FILE_BASE="examples/${FILE_BASE}"
+        echo "Found file in examples directory: ${FILE_BASE}.nim"
+    else
+        echo "Error: File not found: ${FILE_BASE}.nim"
+        if [ -z "$USER_FILE" ]; then
+            echo "Hint: Create an index.nim file or specify a different file to run"
+        else
+            echo "Hint: File not found in current directory or examples/ directory"
+        fi
+        exit 1
     fi
-    exit 1
 fi
 
 # Compile with userFile define
