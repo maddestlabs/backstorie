@@ -1,12 +1,133 @@
 import strutils, times, parseopt, os, tables, math
-import plugins/plugin_interface
-
-export plugin_interface  # Re-export for user applications
+import macros
 
 when not defined(emscripten):
   import posix, termios
 
 const version = "0.1.0"
+
+# ================================================================
+# INPUT CONSTANTS
+# ================================================================
+
+const
+  INPUT_ESCAPE* = 27
+  INPUT_BACKSPACE* = 127
+  INPUT_SPACE* = 32
+  INPUT_TAB* = 9
+  INPUT_ENTER* = 13
+  INPUT_DELETE* = 46
+
+  INPUT_UP* = 1000
+  INPUT_DOWN* = 1001
+  INPUT_LEFT* = 1002
+  INPUT_RIGHT* = 1003
+
+  INPUT_HOME* = 1004
+  INPUT_END* = 1005
+  INPUT_PAGE_UP* = 1006
+  INPUT_PAGE_DOWN* = 1007
+
+  INPUT_F1* = 1008
+  INPUT_F2* = 1009
+  INPUT_F3* = 1010
+  INPUT_F4* = 1011
+  INPUT_F5* = 1012
+  INPUT_F6* = 1013
+  INPUT_F7* = 1014
+  INPUT_F8* = 1015
+  INPUT_F9* = 1016
+  INPUT_F10* = 1017
+  INPUT_F11* = 1018
+  INPUT_F12* = 1019
+
+const
+  ModShift* = 0'u8
+  ModAlt* = 1'u8
+  ModCtrl* = 2'u8
+  ModSuper* = 3'u8
+
+# ================================================================
+# INPUT EVENT TYPES
+# ================================================================
+
+type
+  InputAction* = enum
+    Press
+    Release
+    Repeat
+
+  MouseButton* = enum
+    Left
+    Middle
+    Right
+    Unknown
+    ScrollUp
+    ScrollDown
+
+  InputEventKind* = enum
+    KeyEvent
+    TextEvent
+    MouseEvent
+    MouseMoveEvent
+    ResizeEvent
+
+  InputEvent* = object
+    case kind*: InputEventKind
+    of KeyEvent:
+      keyCode*: int
+      keyMods*: set[uint8]
+      keyAction*: InputAction
+    of TextEvent:
+      text*: string
+    of MouseEvent:
+      button*: MouseButton
+      mouseX*: int
+      mouseY*: int
+      mods*: set[uint8]
+      action*: InputAction
+    of MouseMoveEvent:
+      moveX*: int
+      moveY*: int
+      moveMods*: set[uint8]
+    of ResizeEvent:
+      newWidth*: int
+      newHeight*: int
+
+# ================================================================
+# COLOR AND STYLE SYSTEM
+# ================================================================
+
+type
+  Color* = object
+    r*, g*, b*: uint8
+
+  Style* = object
+    fg*: Color
+    bg*: Color
+    bold*: bool
+    underline*: bool
+    italic*: bool
+    dim*: bool
+
+# Color constructor helpers
+proc rgb*(r, g, b: uint8): Color =
+  Color(r: r, g: g, b: b)
+
+proc gray*(level: uint8): Color =
+  rgb(level, level, level)
+
+proc black*(): Color = rgb(0, 0, 0)
+proc red*(): Color = rgb(255, 0, 0)
+proc green*(): Color = rgb(0, 255, 0)
+proc yellow*(): Color = rgb(255, 255, 0)
+proc blue*(): Color = rgb(0, 0, 255)
+proc magenta*(): Color = rgb(255, 0, 255)
+proc cyan*(): Color = rgb(0, 255, 255)
+proc white*(): Color = rgb(255, 255, 255)
+
+proc defaultStyle*(): Style =
+  Style(fg: white(), bg: black(), bold: false, underline: false, italic: false, dim: false)
 
 # ================================================================
 # TERMINAL INPUT PARSER (sophisticated)
@@ -459,7 +580,6 @@ type
     z*: int
     visible*: bool
     buffer*: TermBuffer
-    handle*: int  # Unique handle for plugin API
 
   AppState* = ref object
     running*: bool
@@ -472,10 +592,7 @@ type
     lastFpsUpdate*: float
     targetFps*: float
     colorSupport*: int
-    plugins*: seq[PluginModule]
-    pluginData*: Table[string, PluginContextBase]
     layers*: seq[Layer]
-    layerHandleCounter*: int
     inputParser*: TerminalInputParser
     lastMouseX*, lastMouseY*: int
 
@@ -790,13 +907,11 @@ proc display*(tb: var TermBuffer, prev: var TermBuffer, colorSupport: int) =
 # ================================================================
 
 proc addLayer*(state: AppState, id: string, z: int): Layer =
-  inc state.layerHandleCounter
   let layer = Layer(
     id: id,
     z: z,
     visible: true,
-    buffer: newTermBuffer(state.termWidth, state.termHeight),
-    handle: state.layerHandleCounter
+    buffer: newTermBuffer(state.termWidth, state.termHeight)
   )
   layer.buffer.clearTransparent()
   state.layers.add(layer)
@@ -805,12 +920,6 @@ proc addLayer*(state: AppState, id: string, z: int): Layer =
 proc getLayer*(state: AppState, id: string): Layer =
   for layer in state.layers:
     if layer.id == id:
-      return layer
-  return nil
-
-proc getLayerByHandle*(state: AppState, handle: LayerHandle): Layer =
-  for layer in state.layers:
-    if layer.handle == handle.int:
       return layer
   return nil
 
@@ -849,140 +958,6 @@ proc setTargetFps*(state: AppState, fps: float) =
   state.targetFps = fps
 
 # ================================================================
-# PLUGIN API IMPLEMENTATION
-# ================================================================
-
-proc createPluginAPI*(state: AppState): PluginAPI =
-  ## Create a PluginAPI that provides controlled access to engine features
-  result.addLayer = proc(id: string, z: int): LayerHandle =
-    let layer = state.addLayer(id, z)
-    return LayerHandle(layer.handle)
-  
-  result.getLayer = proc(id: string): LayerHandle =
-    let layer = state.getLayer(id)
-    if layer.isNil:
-      return LayerHandle(0)
-    return LayerHandle(layer.handle)
-  
-  result.removeLayer = proc(id: string) =
-    state.removeLayer(id)
-  
-  result.setLayerVisible = proc(layer: LayerHandle, visible: bool) =
-    let L = state.getLayerByHandle(layer)
-    if not L.isNil:
-      L.visible = visible
-  
-  result.layerWrite = proc(layer: LayerHandle, x, y: int, ch: string, style: Style) =
-    let L = state.getLayerByHandle(layer)
-    if not L.isNil:
-      L.buffer.write(x, y, ch, style)
-  
-  result.layerWriteText = proc(layer: LayerHandle, x, y: int, text: string, style: Style) =
-    let L = state.getLayerByHandle(layer)
-    if not L.isNil:
-      L.buffer.writeText(x, y, text, style)
-  
-  result.layerFillRect = proc(layer: LayerHandle, x, y, w, h: int, ch: string, style: Style) =
-    let L = state.getLayerByHandle(layer)
-    if not L.isNil:
-      L.buffer.fillRect(x, y, w, h, ch, style)
-  
-  result.layerClear = proc(layer: LayerHandle) =
-    let L = state.getLayerByHandle(layer)
-    if not L.isNil:
-      L.buffer.clear()
-  
-  result.layerClearTransparent = proc(layer: LayerHandle) =
-    let L = state.getLayerByHandle(layer)
-    if not L.isNil:
-      L.buffer.clearTransparent()
-  
-  result.layerSetClip = proc(layer: LayerHandle, x, y, w, h: int) =
-    let L = state.getLayerByHandle(layer)
-    if not L.isNil:
-      L.buffer.setClip(x, y, w, h)
-  
-  result.layerClearClip = proc(layer: LayerHandle) =
-    let L = state.getLayerByHandle(layer)
-    if not L.isNil:
-      L.buffer.clearClip()
-  
-  result.layerSetOffset = proc(layer: LayerHandle, x, y: int) =
-    let L = state.getLayerByHandle(layer)
-    if not L.isNil:
-      L.buffer.setOffset(x, y)
-  
-  result.write = proc(x, y: int, ch: string, style: Style) =
-    state.currentBuffer.write(x, y, ch, style)
-  
-  result.writeText = proc(x, y: int, text: string, style: Style) =
-    state.currentBuffer.writeText(x, y, text, style)
-  
-  result.fillRect = proc(x, y, w, h: int, ch: string, style: Style) =
-    state.currentBuffer.fillRect(x, y, w, h, ch, style)
-  
-  result.getTermSize = proc(): (int, int) =
-    return (state.termWidth, state.termHeight)
-  
-  result.getFrameCount = proc(): int =
-    return state.frameCount
-  
-  result.getTotalTime = proc(): float =
-    return state.totalTime
-  
-  result.getFPS = proc(): float =
-    return state.fps
-  
-  result.isRunning = proc(): bool =
-    return state.running
-  
-  result.requestShutdown = proc() =
-    state.running = false
-  
-  result.getPluginData = proc(name: string): PluginContextBase =
-    return state.pluginData.getOrDefault(name, nil)
-  
-  result.setPluginData = proc(name: string, data: PluginContextBase) =
-    state.pluginData[name] = data
-
-# ================================================================
-# PLUGIN SYSTEM
-# ================================================================
-
-proc registerPlugin*(state: AppState, plugin: PluginModule) =
-  state.plugins.add(plugin)
-  if not plugin.initProc.isNil:
-    let api = state.createPluginAPI()
-    plugin.initProc(api)
-
-proc updatePlugins*(state: AppState, deltaTime: float) =
-  let api = state.createPluginAPI()
-  for plugin in state.plugins:
-    if not plugin.updateProc.isNil:
-      plugin.updateProc(api, deltaTime)
-
-proc renderPlugins*(state: AppState) =
-  let api = state.createPluginAPI()
-  for plugin in state.plugins:
-    if not plugin.renderProc.isNil:
-      plugin.renderProc(api)
-
-proc handlePluginEvents*(state: AppState, event: InputEvent): bool =
-  let api = state.createPluginAPI()
-  for i in countdown(state.plugins.high, 0):
-    let plugin = state.plugins[i]
-    if not plugin.handleEventProc.isNil:
-      if plugin.handleEventProc(api, event):
-        return true
-  return false
-
-proc shutdownPlugins*(state: AppState) =
-  let api = state.createPluginAPI()
-  for plugin in state.plugins:
-    if not plugin.shutdownProc.isNil:
-      plugin.shutdownProc(api)
-
-# ================================================================
 # USER CALLBACKS
 # ================================================================
 
@@ -994,41 +969,19 @@ when not defined(emscripten):
   var onInput*: proc(state: AppState, event: InputEvent): bool = nil
   
   # Include user-specified file or default to index.nim at compile time
-  # To run a specific file, use: ./run.sh <filename>
+  # To run a specific file, use: ./compile.sh <filename>
   # Or compile with: nim c -d:userFile="filename" backstorie.nim
   const userFile {.strdefine.} = "index"
   
-  when userFile == "example_boxes":
-    when fileExists("example_boxes.nim"):
-      include example_boxes
-    else:
-      {.error: "example_boxes.nim not found".}
-  elif userFile == "example_simple_counter":
-    when fileExists("example_simple_counter.nim"):
-      include example_simple_counter
-    else:
-      {.error: "example_simple_counter.nim not found".}
-  elif userFile == "example_fadein":
-    when fileExists("example_fadein.nim"):
-      include example_fadein
-    else:
-      {.error: "example_fadein.nim not found".}
-  elif userFile == "example_events_plugin":
-    when fileExists("example_events_plugin.nim"):
-      include example_events_plugin
-    else:
-      {.error: "example_events_plugin.nim not found".}
-  elif userFile == "example_core_events":
-    when fileExists("example_core_events.nim"):
-      include example_core_events
-    else:
-      {.error: "example_core_events.nim not found".}
-  else:
-    # Default to index.nim
-    when fileExists("index.nim"):
-      include index
-    else:
-      {.error: "index.nim not found. Create index.nim or specify a valid file with -d:userFile=<filename>".}
+  # Macro to dynamically include file based on compile-time string
+  macro includeUserFile(filename: static[string]): untyped =
+    let file = if filename.endsWith(".nim"): filename else: filename & ".nim"
+    if not fileExists(file):
+      error("File not found: " & file & ". Create the file or specify a different one with -d:userFile=<filename>")
+    result = newNimNode(nnkIncludeStmt)
+    result.add(newIdentNode(file.replace(".nim", "")))
+  
+  includeUserFile(userFile)
   
   proc callOnSetup(state: AppState) =
     if not onInit.isNil:
@@ -1067,10 +1020,8 @@ when defined(emscripten):
     globalState.colorSupport = detectColorSupport()
     globalState.running = true
     globalState.layers = @[]
-    globalState.layerHandleCounter = 0
     globalState.targetFps = 60.0
     globalState.inputParser = newTerminalInputParser()
-    globalState.pluginData = initTable[string, PluginContextBase]()
   
   proc emUpdate(deltaMs: float) {.exportc.} =
     let dt = deltaMs / 1000.0
@@ -1081,10 +1032,7 @@ when defined(emscripten):
       globalState.fps = 1.0 / dt
       globalState.lastFpsUpdate = globalState.totalTime
     
-    updatePlugins(globalState, dt)
-    
     swap(globalState.currentBuffer, globalState.previousBuffer)
-    renderPlugins(globalState)
     compositeLayers(globalState)
   
   proc emResize(width, height: int) {.exportc.} =
@@ -1139,9 +1087,7 @@ proc main() =
   when not defined(emscripten):
     var state = new(AppState)
     state.colorSupport = detectColorSupport()
-    state.pluginData = initTable[string, PluginContextBase]()
     state.layers = @[]
-    state.layerHandleCounter = 0
     state.inputParser = newTerminalInputParser()
     state.targetFps = 60.0
     
@@ -1185,8 +1131,7 @@ proc main() =
             stdout.write("\e[2J\e[H")
             stdout.flushFile()
           else:
-            if not handlePluginEvents(state, event):
-              discard callOnInput(state, event)
+            discard callOnInput(state, event)
         
         let (newW, newH) = getTermSize()
         if newW != state.termWidth or newH != state.termHeight:
@@ -1205,11 +1150,9 @@ proc main() =
           state.fps = 1.0 / deltaTime
           state.lastFpsUpdate = state.totalTime
         
-        updatePlugins(state, deltaTime)
         callOnFrame(state, deltaTime)
         
         swap(state.currentBuffer, state.previousBuffer)
-        renderPlugins(state)
         callOnDraw(state)
         compositeLayers(state)
         
@@ -1225,7 +1168,6 @@ proc main() =
         if not globalRunning:
           break
     finally:
-      shutdownPlugins(state)
       callOnShutdown(state)
       disableKeyboardProtocol()
       disableMouseReporting()

@@ -14,7 +14,7 @@ var eventCount = 0
 # RENDERING
 # ================================================================
 
-proc renderScreen(state: var AppState) =
+proc renderScreen(state: AppState) =
   ## Render the demo UI
   
   state.currentBuffer.clear()
@@ -97,19 +97,19 @@ proc handleEvent(event: InputEvent) =
 # ASSIGN THE BACKSTORIE CALLBACKS
 # ================================================================
 
-onInit = proc(state: var AppState) =
+onInit = proc(state: AppState) =
   ## Initialize
   eventLog.add("App initialized")
 
-onUpdate = proc(state: var AppState, dt: float) =
+onUpdate = proc(state: AppState, dt: float) =
   ## Update
   discard
 
-onRender = proc(state: var AppState) =
+onRender = proc(state: AppState) =
   ## Render
   renderScreen(state)
 
-onInput = proc(state: var AppState, event: InputEvent): bool =
+onInput = proc(state: AppState, event: InputEvent): bool =
   ## Handle input - process event directly
   
   handleEvent(event)
@@ -121,6 +121,6 @@ onInput = proc(state: var AppState, event: InputEvent): bool =
   
   return false
 
-onShutdown = proc(state: var AppState) =
+onShutdown = proc(state: AppState) =
   ## Cleanup
   discard

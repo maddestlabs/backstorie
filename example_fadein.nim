@@ -1,28 +1,85 @@
-# Test FadeIn standalone
-import plugins/animation_v2
-import plugins/styles
+# FadeIn Animation Demo - Direct API
+import math
 
-var uiLayer: Layer
+# ================================================================
+# ANIMATION STATE
+# ================================================================
 
-proc setupExample(state: var AppState) =
-  let animPlugin = createAnimationPlugin()
-  state.registerPlugin(animPlugin)
+var 
+  fadeLayer: Layer
+  fadeTime: float = 0.0
+  fadeDuration: float = 2.0
+  fadeText: string = "FADE IN TEST"
+  fadeX: int = 5
+  fadeY: int = 5
+
+# ================================================================
+# EASING FUNCTION
+# ================================================================
+
+proc easeInSine(t: float): float =
+  ## Smooth ease-in using sine curve
+  return 1.0 - cos((t * PI) / 2.0)
+
+# ================================================================
+# CALLBACKS
+# ================================================================
+
+onInit = proc(state: AppState) =
+  ## Initialize fade animation layer
+  fadeLayer = state.addLayer("fade", 100)
+
+onUpdate = proc(state: AppState, dt: float) =
+  ## Update fade animation
+  if fadeTime < fadeDuration:
+    fadeTime += dt
+
+onRender = proc(state: AppState) =
+  ## Render fade effect
+  state.currentBuffer.clear()
+  fadeLayer.buffer.clearTransparent()
   
-  uiLayer = state.addLayer("ui", 100)
+  # Calculate fade progress (0.0 to 1.0)
+  let progress = min(fadeTime / fadeDuration, 1.0)
+  let easedProgress = easeInSine(progress)
   
-  let fade = newFadeIn("fade1", uiLayer, 5, 5,
-                      "FADE IN TEST",
-                      getStyle("default"), 2.0, ekEaseInSine)
-  state.addAnimation(fade)
-
-proc updateExample(state: var AppState, dt: float) =
-  discard
-
-proc renderExample(state: var AppState) =
-  state.currentBuffer.writeText(1, 1, "Fade test", getStyle("default"))
+  # Calculate alpha (0-255)
+  let alpha = uint8(easedProgress * 255.0)
+  
+  # Create fading style
+  let fadeStyle = Style(
+    fg: rgb(alpha, alpha, alpha),
+    bg: black(),
+    bold: false,
+    underline: false,
+    italic: false,
+    dim: false
+  )
+  
+  # Render fading text
+  fadeLayer.buffer.writeText(fadeX, fadeY, fadeText, fadeStyle)
+  
+  # Show instructions
+  let dimStyle = Style(
+    fg: gray(128),
+    bg: black(),
+    bold: false,
+    underline: false,
+    italic: false,
+    dim: true
+  )
+  state.currentBuffer.writeText(1, 1, "FadeIn Animation Demo", defaultStyle())
   let y = state.termHeight - 2
-  state.currentBuffer.writeText(1, y, "Ctrl+C", getStyle("dim"))
+  state.currentBuffer.writeText(1, y, "Press 'q' to quit", dimStyle)
 
-onInit = setupExample
-onUpdate = updateExample
-onRender = renderExample
+onInput = proc(state: AppState, event: InputEvent): bool =
+  ## Handle input
+  if event.kind == KeyEvent:
+    if event.keyCode == ord('q') or event.keyCode == ord('Q'):
+      state.running = false
+      return true
+  return false
+
+onShutdown = proc(state: AppState) =
+  ## Cleanup
+  discard

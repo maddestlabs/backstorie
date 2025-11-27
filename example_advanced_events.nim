@@ -1,17 +1,173 @@
-## Advanced Event Handler Plugin Example
-## Showcases all features of the events.nim plugin system
+## Advanced Event Handler Example - Direct API Version
+## Showcases event handling without plugin boilerplate
 ## 
 ## Features demonstrated:
 ## - Key capture and ignore patterns
-## - Multi-callback event handling
+## - Multi-callback event handling  
 ## - Key state tracking (pressed, repeat count)
 ## - Mouse state tracking (position, buttons, dragging)
 ## - Event consumption/delegation
 ## - Key binding simulation
 ## - Event filtering and statistics
 
-import ./plugins/events
-import std/strformat
+import std/[strformat, tables, sets, hashes, times]
+
+# ================================================================
+# EVENT HANDLER (inlined for this example)
+# ================================================================
+
+type
+  KeyState = object
+    code: int
+    mods: set[uint8]
+    isPressed: bool
+    repeatCount: int
+    lastEventTime: float
+
+  MouseState = object
+    x, y: int
+    leftPressed: bool
+    middlePressed: bool
+    rightPressed: bool
+    lastX, lastY: int
+    dragStartX, dragStartY: int
+    isDragging: bool
+
+  TerminalEventHandler = ref object
+    onText: proc(text: string): bool {.nimcall.}
+    onKeyDown: proc(code: int, mods: set[uint8]): bool {.nimcall.}
+    onKeyUp: proc(code: int, mods: set[uint8]): bool {.nimcall.}
+    onKeyRepeat: proc(code: int, mods: set[uint8], count: int): bool {.nimcall.}
+    onMouseDown: proc(button: MouseButton, x, y: int, mods: set[uint8]): bool {.nimcall.}
+    onMouseMove: proc(x, y: int, mods: set[uint8]): bool {.nimcall.}
+    onMouseDrag: proc(button: MouseButton, x, y: int, mods: set[uint8]): bool {.nimcall.}
+    onMouseScroll: proc(delta: int, x, y: int, mods: set[uint8]): bool {.nimcall.}
+    onResize: proc(w, h: int): bool {.nimcall.}
+    
+    keyStates: Table[int, KeyState]
+    mouseState: MouseState
+    capturedKeys: HashSet[int]
+    ignoreKeys: HashSet[int]
+    eventCount: int
+    droppedEvents: int
+
+proc newTerminalEventHandler(): TerminalEventHandler =
+  result = TerminalEventHandler()
+  result.keyStates = initTable[int, KeyState]()
+  result.capturedKeys = initHashSet[int]()
+  result.ignoreKeys = initHashSet[int]()
+
+proc captureKey(handler: TerminalEventHandler, keyCode: int) =
+  handler.capturedKeys.incl(keyCode)
+
+proc ignoreKey(handler: TerminalEventHandler, keyCode: int) =
+  handler.ignoreKeys.incl(keyCode)
+
+proc updateKeyState(handler: TerminalEventHandler, code: int, mods: set[uint8], 
+                   action: InputAction) =
+  if action == Press:
+    if code in handler.keyStates:
+      handler.keyStates[code].repeatCount += 1
+    else:
+      handler.keyStates[code] = KeyState(
+        code: code, mods: mods, isPressed: true, repeatCount: 0
+      )
+  elif action == Release:
+    if code in handler.keyStates:
+      handler.keyStates[code].isPressed = false
+      handler.keyStates[code].repeatCount = 0
+  elif action == Repeat:
+    if code in handler.keyStates:
+      handler.keyStates[code].repeatCount += 1
+
+proc updateMouseState(handler: TerminalEventHandler, button: MouseButton, 
+                     x, y: int, action: InputAction) =
+  handler.mouseState.lastX = handler.mouseState.x
+  handler.mouseState.lastY = handler.mouseState.y
+  handler.mouseState.x = x
+  handler.mouseState.y = y
+  
+  case button
+  of Left:
+    if action == Press:
+      handler.mouseState.leftPressed = true
+      handler.mouseState.dragStartX = x
+      handler.mouseState.dragStartY = y
+    elif action == Release:
+      handler.mouseState.leftPressed = false
+      handler.mouseState.isDragging = false
+  of Middle:
+    handler.mouseState.middlePressed = (action == Press)
+  of Right:
+    handler.mouseState.rightPressed = (action == Press)
+  else:
+    discard
+  
+  if handler.mouseState.leftPressed:
+    let dx = abs(x - handler.mouseState.dragStartX)
+    let dy = abs(y - handler.mouseState.dragStartY)
+    if dx > 0 or dy > 0:
+      handler.mouseState.isDragging = true
+
+proc dispatchEvent(handler: TerminalEventHandler, event: InputEvent): bool =
+  handler.eventCount += 1
+  var handled = false
+  
+  case event.kind
+  of TextEvent:
+    if not handler.onText.isNil:
+      handled = handler.onText(event.text)
+  
+  of KeyEvent:
+    if event.keyCode in handler.ignoreKeys:
+      return false
+    
+    handler.updateKeyState(event.keyCode, event.keyMods, event.keyAction)
+    
+    case event.keyAction
+    of Press:
+      if not handler.onKeyDown.isNil:
+        handled = handler.onKeyDown(event.keyCode, event.keyMods)
+    of Release:
+      if not handler.onKeyUp.isNil:
+        handled = handler.onKeyUp(event.keyCode, event.keyMods)
+    of Repeat:
+      if not handler.onKeyRepeat.isNil:
+        let count = handler.keyStates[event.keyCode].repeatCount
+        handled = handler.onKeyRepeat(event.keyCode, event.keyMods, count)
+  
+  of MouseEvent:
+    handler.updateMouseState(event.button, event.mouseX, event.mouseY, event.action)
+    
+    case event.button
+    of ScrollUp, ScrollDown:
+      if not handler.onMouseScroll.isNil:
+        let delta = if event.button == ScrollUp: 1 else: -1
+        handled = handler.onMouseScroll(delta, event.mouseX, event.mouseY, event.mods)
+    else:
+      if event.action == Press and not handler.onMouseDown.isNil:
+        handled = handler.onMouseDown(event.button, event.mouseX, event.mouseY, event.mods)
+  
+  of MouseMoveEvent:
+    handler.mouseState.x = event.moveX
+    handler.mouseState.y = event.moveY
+    
+    if handler.mouseState.isDragging:
+      if not handler.onMouseDrag.isNil:
+        let button = if handler.mouseState.leftPressed: Left else: Unknown
+        handled = handler.onMouseDrag(button, event.moveX, event.moveY, event.moveMods)
+    else:
+      if not handler.onMouseMove.isNil:
+        handled = handler.onMouseMove(event.moveX, event.moveY, event.moveMods)
+  
+  of ResizeEvent:
+    if not handler.onResize.isNil:
+      handled = handler.onResize(event.newWidth, event.newHeight)
+  
+  return handled
+
+proc getStats(handler: TerminalEventHandler): (int, int) =
+  return (handler.eventCount, handler.droppedEvents)
 
 # ================================================================
 # GAME STATE
@@ -31,18 +187,8 @@ var chargeLevel = 0
 # ================================================================
 
 proc setupAdvancedEventHandler(): TerminalEventHandler =
-  ## Demonstrates ALL events.nim plugin features
-  
-  let config = EventHandlerConfig(
-    consumeEvents: true,           # Prevent other handlers
-    enableLogging: false,          # No spam
-    enableRepeatTracking: true,    # Track key repeats for charging
-    enableMouseTracking: true,     # Full mouse support
-    enableResizeTracking: true,    # Handle window resize
-    maxCallbackDepth: 10
-  )
-  
-  let handler = newTerminalEventHandler(config)
+  ## Demonstrates event handler features
+  let handler = newTerminalEventHandler()
   
   # ================================================================
   # FEATURE 1: KEY CAPTURE - Always handle these keys
@@ -204,12 +350,7 @@ proc setupAdvancedEventHandler(): TerminalEventHandler =
   handler.onMouseMove = proc(x, y: int, mods: set[uint8]): bool {.nimcall.} =
     ## Track mouse movement (not dragging)
     ## Great for UI highlighting, targeting, etc.
-    
-    # Only log occasionally to avoid spam
-    if handler.mouseState.lastX != x or handler.mouseState.lastY != y:
-      # Could highlight items under cursor, show tooltips, etc.
-      discard
-    
+    # Could highlight items under cursor, show tooltips, etc.
     return false
   
   # ================================================================
@@ -222,7 +363,7 @@ proc setupAdvancedEventHandler(): TerminalEventHandler =
     
     case button
     of MouseButton.Left:
-      eventLog.add(&"Dragging from ({handler.mouseState.dragStartX}, {handler.mouseState.dragStartY}) to ({x}, {y})")
+      eventLog.add(&"Dragging to ({x}, {y})")
       # Could implement: selection box, item dragging, etc.
     else:
       discard
@@ -276,7 +417,7 @@ proc setupAdvancedEventHandler(): TerminalEventHandler =
 # RENDERING
 # ================================================================
 
-proc renderGameUI(state: var AppState, handler: TerminalEventHandler) =
+proc renderGameUI(state: AppState, handler: TerminalEventHandler) =
   ## Render the advanced game UI
   
   state.currentBuffer.clear()
@@ -345,27 +486,26 @@ proc renderGameUI(state: var AppState, handler: TerminalEventHandler) =
 
 var advancedHandler: TerminalEventHandler
 
-onInit = proc(state: var AppState) =
+onInit = proc(state: AppState) =
   ## Initialize with advanced event handler
   advancedHandler = setupAdvancedEventHandler()
   eventLog.add("Advanced event handler initialized")
   eventLog.add("Try all features: movement, attacks, mouse, scrolling")
 
-onUpdate = proc(state: var AppState, dt: float) =
+onUpdate = proc(state: AppState, dt: float) =
   ## Update game state
   discard
 
-onRender = proc(state: var AppState) =
+onRender = proc(state: AppState) =
   ## Render the UI
   renderGameUI(state, advancedHandler)
 
-onInput = proc(state: var AppState, event: InputEvent): bool =
+onInput = proc(state: AppState, event: InputEvent): bool =
   ## Handle input through advanced event handler
   if advancedHandler != nil:
     return dispatchEvent(advancedHandler, event)
   return false
 
-onShutdown = proc(state: var AppState) =
+onShutdown = proc(state: AppState) =
   ## Cleanup
   discard
-ENDFILE

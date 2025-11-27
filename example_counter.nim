@@ -1,49 +1,47 @@
-## ================================================================
-## Simple Counter Demo - Demonstrates plugin architecture
-## ================================================================
-## Run with: nim c -r backstorie.nim
+## Simple Counter - Direct API
+## Minimal example showing the simplified architecture
 
-import plugins/simple_counter
-
-var infoText = "Press 'r' to reset counter | Press 'q' to quit"
+var counter = 0
+var message = "Press space to increment, 'r' to reset, 'q' to quit"
 
 onInit = proc(state: AppState) =
-  # Register the counter plugin
-  state.registerPlugin(createCounterPlugin())
+  discard  # No setup needed for this simple example
 
 onUpdate = proc(state: AppState, dt: float) =
-  discard
+  discard  # No per-frame updates needed
 
 onRender = proc(state: AppState) =
-  # Draw some UI
-  let style = Style(fg: cyan(), bg: black())
-  let dimStyle = Style(fg: gray(128), bg: black(), dim: true)
+  state.currentBuffer.clear()
   
-  state.currentBuffer.writeText(1, 1, "=== Simple Counter Demo ===", style)
-  state.currentBuffer.writeText(1, 2, infoText, dimStyle)
+  let titleStyle = Style(fg: yellow(), bg: black(), bold: true)
+  let counterStyle = Style(fg: cyan(), bg: black(), bold: true)
+  let textStyle = Style(fg: white(), bg: black())
   
-  # Show FPS
-  let fpsText = "FPS: " & $int(state.fps)
-  state.currentBuffer.writeText(1, state.termHeight - 2, fpsText, dimStyle)
+  # Draw title
+  state.currentBuffer.writeText(2, 2, "Counter Demo", titleStyle)
+  
+  # Draw counter value (big!)
+  let counterText = $counter
+  let x = (state.termWidth - counterText.len) div 2
+  state.currentBuffer.writeText(x, state.termHeight div 2, counterText, counterStyle)
+  
+  # Draw instructions
+  state.currentBuffer.writeText(2, state.termHeight - 2, message, textStyle)
 
 onInput = proc(state: AppState, event: InputEvent): bool =
-  # Handle quit
   if event.kind == KeyEvent and event.keyAction == Press:
-    if event.keyCode == ord('q'):
+    case event.keyCode
+    of INPUT_SPACE:
+      inc counter
+      return true
+    of ord('r'):
+      counter = 0
+      return true
+    of ord('q'):
       state.running = false
       return true
-    elif event.keyCode == ord('r'):
-      # Reset counter plugin
-      if state.isPluginRegistered("simple_counter"):
-        let counterPlugin = state.getPlugin("simple_counter")
-        let counterCtx = counterPlugin.getContext[CounterState](state)
-        counterCtx.data.count = 0
-        return true
-  elif event.kind == TextEvent:
-    # Handle regular character input
-    if event.text == "q":
-      state.running = false
-      return true
+    else:
+      discard
   return false
 
 onShutdown = proc(state: AppState) =
