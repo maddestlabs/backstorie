@@ -7,7 +7,7 @@
 ## - Render demonstration content to a layer
 ## - Handle events to change display options
 
-import ../plugin_interface
+import plugin_interface
 import tables, strutils
 
 # ================================================================

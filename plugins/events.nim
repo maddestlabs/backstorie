@@ -3,7 +3,7 @@
 ## Covers all InputEvent types with flexible callback support
 
 import std/[tables, sets, sequtils, hashes, strformat, times]
-import ../plugin_interface
+import plugin_interface
 
 # ================================================================
 # EVENT HANDLER CONFIGURATION AND STATE

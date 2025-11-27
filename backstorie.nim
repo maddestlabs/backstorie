@@ -1,5 +1,5 @@
 import strutils, times, parseopt, os, tables, math
-import plugin_interface
+import plugins/plugin_interface
 
 export plugin_interface  # Re-export for user applications
 

@@ -1,5 +1,5 @@
 # Test FadeIn standalone
-import plugins/animation
+import plugins/animation_v2
 import plugins/styles
 
 var uiLayer: Layer

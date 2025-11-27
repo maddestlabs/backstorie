@@ -7,7 +7,7 @@
 ## - Access engine through PluginAPI only
 ## - No direct access to AppState internals
 
-import ../plugin_interface
+import plugin_interface
 
 # ================================================================
 # PLUGIN STATE (type-safe)

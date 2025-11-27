@@ -1,5 +1,5 @@
 #!/bin/bash
-# Backstorie runner script - compile and run with custom file support
+# Backstorie compiler script - compile and run with custom file support
 
 VERSION="0.1.0"
 
@@ -8,7 +8,7 @@ show_help() {
 backstorie v$VERSION
 Terminal engine with sophisticated input parsing
 
-Usage: ./run.sh [OPTIONS] [FILE]
+Usage: ./compile.sh [OPTIONS] [FILE]
 
 Arguments:
   FILE                   Nim file to run (default: index.nim)
@@ -21,11 +21,11 @@ Options:
   -c, --compile-only    Compile without running
 
 Examples:
-  ./run.sh                           # Run index.nim
-  ./run.sh example_boxes             # Run example_boxes.nim
-  ./run.sh plugins/simple_counter    # Run plugins/simple_counter.nim
-  ./run.sh -r example_boxes          # Compile optimized and run
-  ./run.sh -c example_boxes          # Compile only, don't run
+  ./compile.sh                           # Run index.nim
+  ./compile.sh example_boxes             # Run example_boxes.nim
+  ./compile.sh plugins/simple_counter    # Run plugins/simple_counter.nim
+  ./compile.sh -r example_boxes          # Compile optimized and run
+  ./compile.sh -c example_boxes          # Compile only, don't run
 
 EOF
 }
