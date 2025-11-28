@@ -10,6 +10,9 @@ web/backstorie.wasm
 web/backstorie.wasm.js
 web/backstorie.wasm.wasm
 
+# Emscripten SDK (local installation)
+emsdk/
+
 # OS files
 .DS_Store
 Thumbs.db
