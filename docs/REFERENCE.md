@@ -4,14 +4,14 @@
 
 ### Native
 ```bash
-./compile.sh example_boxes           # Compile and run
-nim c -r backstorie.nim              # Direct compilation
+./build.sh example_boxes          # Compile and run
+nim c -r backstorie.nim           # Direct compilation
 ```
 
 ### WASM
 ```bash
-./compile_wasm.sh example_boxes      # Compile to WASM
-./compile_wasm.sh -s example_boxes   # Compile and serve
+./build-web.sh example_boxes      # Compile to WASM using Emscripten
+./build-web.sh -s example_boxes   # Compile and serve
 ```
 
 ## Code Differences
@@ -90,11 +90,11 @@ else:
 
 ```bash
 # Test native version
-./compile.sh myapp
+./build.sh myapp
 ./backstorie
 
 # Test WASM version
-./compile_wasm.sh myapp
+./build-web.sh myapp
 cd web && python3 -m http.server 8000
 # Open http://localhost:8000
 ```
@@ -167,6 +167,6 @@ Native terminals may have limited color support (8/256 colors). WASM always uses
 
 ## Support
 
-- **Documentation**: See `README.md`, `WASM_GUIDE.md`, and `WASM_IMPLEMENTATION.md`
+- **Documentation**: See `README.md`, `WASM_GUIDE.md`
 - **Examples**: All examples in the repo work with both targets
 - **Issues**: Check compilation output for specific errors

@@ -1,6 +1,9 @@
 # Default demo for Backstorie engine
 # Shows a welcome screen with terminal info and border
 
+# This file allows easy building off of Backstorie's engine
+# without needing to touch core engine files.
+
 var welcomeStyle = defaultStyle()
 welcomeStyle.fg = cyan()
 welcomeStyle.bold = true
