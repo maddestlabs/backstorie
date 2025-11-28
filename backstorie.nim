@@ -800,6 +800,16 @@ proc display*(tb: var TermBuffer, prev: var TermBuffer, colorSupport: int) =
       output.add("\e[2J")
       prev = newTermBuffer(tb.width, tb.height)
     
+    # Pre-allocate string capacity for better performance (Windows consoles benefit)
+    when defined(windows):
+      output = newStringOfCap(tb.width * tb.height * 4)
+    
+    var haveLastStyle = false
+    var lastStyle: Style
+    var haveCursor = false
+    var lastCursorY = -1
+    var lastCursorXEnd = -1
+    
     for y in 0 ..< tb.height:
       var x = 0
       while x < tb.width:
@@ -828,14 +838,22 @@ proc display*(tb: var TermBuffer, prev: var TermBuffer, colorSupport: int) =
           else:
             runLength += 1
         
-        output.add("\e[" & $(y + 1) & ";" & $(x + 1) & "H")
-        output.add(buildStyleCode(cell.style, colorSupport))
+        if not haveCursor or lastCursorY != y or lastCursorXEnd != x:
+          output.add("\e[" & $(y + 1) & ";" & $(x + 1) & "H")
+        if (not haveLastStyle) or (not stylesEqual(cell.style, lastStyle)):
+          output.add(buildStyleCode(cell.style, colorSupport))
+          lastStyle = cell.style
+          haveLastStyle = true
         
         for i in 0 ..< runLength:
           output.add(tb.cells[idx + i].ch)
         
         x += runLength
+        haveCursor = true
+        lastCursorY = y
+        lastCursorXEnd = x
     
+    # Batch write for better Windows console performance
     stdout.write(output)
     stdout.flushFile()
 
@@ -1177,6 +1195,8 @@ proc showHelp() =
   echo "Options:"
   echo "  -h, --help            Show this help message"
   echo "  -v, --version         Show version information"
+  echo "  --fps <num>          Set target FPS (default 60; Windows non-WT default 30)"
+  echo "                       Can also use BACKSTORIE_TARGET_FPS env var"
   echo ""
   echo "Examples:"
   echo "  ./run.sh example_boxes              # Run example_boxes.nim"
@@ -1186,6 +1206,7 @@ proc showHelp() =
 
 proc main() =
   var p = initOptParser()
+  var cliFps: float = 0.0
   
   for kind, key, val in p.getopt():
     case kind
@@ -1206,6 +1227,23 @@ proc main() =
       echo "Note: To run a custom file, use: nim c -r -d:userFile=<file> backstorie.nim"
       quit(1)
     else: discard
+    # Handle long option with value (e.g., --fps 30 or --fps=30)
+    if kind in {cmdLongOption, cmdShortOption}:
+      case key
+      of "fps":
+        if val.len == 0:
+          echo "--fps requires a value (e.g., --fps 30)"
+          quit(1)
+        try:
+          let f = parseFloat(val)
+          if f <= 0:
+            echo "--fps must be > 0"
+            quit(1)
+          cliFps = f
+        except:
+          echo "Invalid --fps value: " & val
+          quit(1)
+      else: discard
   
   when not defined(emscripten):
     var state = new(AppState)
@@ -1213,6 +1251,20 @@ proc main() =
     state.layers = @[]
     state.inputParser = newTerminalInputParser()
     state.targetFps = 60.0
+    when defined(windows):
+      # If not Windows Terminal (WT_SESSION absent), lower default FPS for performance
+      if getEnv("WT_SESSION").len == 0:
+        state.targetFps = 30.0
+    let fpsEnv = getEnv("BACKSTORIE_TARGET_FPS")
+    if fpsEnv.len > 0:
+      try:
+        let envFps = parseFloat(fpsEnv)
+        if envFps > 0:
+          state.targetFps = envFps
+      except:
+        discard  # Ignore invalid values
+    if cliFps > 0.0:
+      state.targetFps = cliFps
     
     globalTerminalState = setupRawMode()
     hideCursor()

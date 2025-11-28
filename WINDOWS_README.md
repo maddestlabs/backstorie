@@ -191,12 +191,42 @@ backstorie.exe
 
 ## Performance Notes
 
-Windows Terminal should give you smooth 60 FPS for most applications. If you experience slowdowns:
+**TL;DR: Use Windows Terminal for best performance!**
 
-1. Make sure you're using Windows Terminal (not legacy CMD)
-2. Reduce the number of screen updates if you have complex rendering
-3. Use layers efficiently to avoid redrawing everything
-4. Check your FPS with the built-in counter
+### Expected Performance by Terminal
+
+| Terminal | Expected FPS | Notes |
+|----------|-------------|-------|
+| **Windows Terminal** | 60 FPS | ✅ Best performance, recommended |
+| **PowerShell 7+** | 20-30 FPS | ⚠️ Slower but usable |
+| **CMD (Legacy)** | 10-20 FPS | ⚠️ Very slow, avoid if possible |
+| **ConEmu** | 30-50 FPS | ✅ Good alternative |
+
+### Why PowerShell is Slower
+
+PowerShell's console has higher ANSI parsing overhead than Windows Terminal. Each frame sends many ANSI escape sequences for colors and positioning, which PowerShell processes slowly.
+
+### How to Get Better Performance
+
+1. **Use Windows Terminal (strongly recommended):**
+   ```powershell
+   wt backstorie.exe
+   ```
+
+2. **If stuck with PowerShell, reduce target FPS:**
+   ```nim
+   onInit = proc(state: AppState) =
+     state.setTargetFps(30.0)  # Lower FPS = less console updates
+   ```
+
+3. **Minimize screen changes:**
+   - Use layers efficiently
+   - Only redraw what changes
+   - Reduce animations
+
+4. **Smaller terminal window:**
+   - Fewer cells = faster rendering
+   - Try 80x24 instead of fullscreen
 
 ## What's Next?
 

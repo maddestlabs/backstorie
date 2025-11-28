@@ -46,6 +46,18 @@ const
   ENABLE_WRAP_AT_EOL_OUTPUT = 0x0002
   ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
 
+  # Input record event types
+  KEY_EVENT = 0x0001
+  MOUSE_EVENT = 0x0002
+  WINDOW_BUFFER_SIZE_EVENT = 0x0004
+
+  # Control key state flags
+  RIGHT_ALT_PRESSED = 0x0001
+  LEFT_ALT_PRESSED  = 0x0002
+  RIGHT_CTRL_PRESSED = 0x0004
+  LEFT_CTRL_PRESSED  = 0x0008
+  SHIFT_PRESSED      = 0x0010
+
 # Windows Console API functions
 proc GetStdHandle(nStdHandle: DWORD): Handle {.
   stdcall, dynlib: "kernel32", importc: "GetStdHandle".}
@@ -59,6 +71,12 @@ proc SetConsoleMode(hConsoleHandle: Handle, dwMode: DWORD): WINBOOL {.
 proc GetConsoleScreenBufferInfo(hConsoleOutput: Handle, 
                                  lpConsoleScreenBufferInfo: ptr CONSOLE_SCREEN_BUFFER_INFO): WINBOOL {.
   stdcall, dynlib: "kernel32", importc: "GetConsoleScreenBufferInfo".}
+
+proc GetNumberOfConsoleInputEvents(hConsoleInput: Handle, lpcNumberOfEvents: ptr DWORD): WINBOOL {.
+  stdcall, dynlib: "kernel32", importc: "GetNumberOfConsoleInputEvents".}
+
+proc ReadConsoleInputW(hConsoleInput: Handle, lpBuffer: pointer, nLength: DWORD, lpNumberOfEventsRead: ptr DWORD): WINBOOL {.
+  stdcall, dynlib: "kernel32", importc: "ReadConsoleInputW".}
 
 type
   TerminalState* = object
@@ -176,25 +194,80 @@ proc ReadFile(hFile: Handle,
               lpOverlapped: pointer): WINBOOL {.
   stdcall, dynlib: "kernel32", importc: "ReadFile".}
 
+type
+  KEY_EVENT_RECORD = object
+    bKeyDown: int32      # BOOL
+    wRepeatCount: uint16
+    wVirtualKeyCode: uint16
+    wVirtualScanCode: uint16
+    UnicodeChar: uint16  # from uChar.UnicodeChar
+    dwControlKeyState: DWORD
+
+  INPUT_RECORD = object
+    EventType: uint16
+    padding: uint16
+    # Only define fields we use (key events); size/layout must match
+    KeyEvent: KEY_EVENT_RECORD
+
 proc readInputRaw*(buffer: var openArray[char]): int =
-  ## Read raw input from stdin without blocking
-  ## Returns the number of bytes read, or 0 if no input available
-  ## 
-  ## MINIMAL IMPLEMENTATION: Uses PeekConsoleInput to check for input
-  ## then ReadFile to read it without blocking indefinitely
-  
+  ## Read input via Windows Console API and encode as CSI u sequences
+  ## Returns number of bytes written to buffer (non-blocking)
   let hStdin = GetStdHandle(STD_INPUT_HANDLE.DWORD)
-  var eventsRead: DWORD = 0
-  
-  # Peek to see if there's input available
-  if PeekConsoleInputW(hStdin, nil, 0, addr eventsRead) != 0:
-    if eventsRead > 0:
-      # There's input available, try to read it
-      var bytesRead: DWORD = 0
-      if ReadFile(hStdin, addr buffer[0], DWORD(buffer.len), addr bytesRead, nil) != 0:
-        return int(bytesRead)
-  
-  return 0
+  var num: DWORD = 0
+  if GetNumberOfConsoleInputEvents(hStdin, addr num) == 0 or num == 0:
+    return 0
+
+  # Read up to a small batch of records
+  let toRead = (if num > 16'u32: 16'u32 else: num)
+  var recs: array[16, INPUT_RECORD]
+  var readCount: DWORD = 0
+  if ReadConsoleInputW(hStdin, addr recs[0], toRead, addr readCount) == 0:
+    return 0
+
+  var outStr = ""
+
+  for i in 0 ..< int(readCount):
+    let r = recs[i]
+    if r.EventType == KEY_EVENT.uint16:
+      let ke = r.KeyEvent
+      var mods = 0
+      if (ke.dwControlKeyState and SHIFT_PRESSED.DWORD) != 0: mods = mods or 0x1
+      if (ke.dwControlKeyState and (LEFT_ALT_PRESSED.DWORD or RIGHT_ALT_PRESSED.DWORD)) != 0: mods = mods or 0x2
+      if (ke.dwControlKeyState and (LEFT_CTRL_PRESSED.DWORD or RIGHT_CTRL_PRESSED.DWORD)) != 0: mods = mods or 0x4
+      # Super/Win key not exposed here; leave bit 0x8 unset
+
+      var action = 0
+      if ke.bKeyDown != 0:
+        if ke.wRepeatCount > 1'u16: action = 2 else: action = 1
+      else:
+        action = 3
+
+      # Determine key code: prefer Unicode char if available
+      var keyCode = int(ke.UnicodeChar)
+      if keyCode == 0:
+        # Map a few common virtual keys
+        case ke.wVirtualKeyCode
+        of 0x1B'u16: keyCode = 27      # VK_ESCAPE
+        of 0x0D'u16: keyCode = 13      # VK_RETURN
+        of 0x08'u16: keyCode = 127     # VK_BACK (map to DEL-like backspace consistent with parser)
+        of 0x09'u16: keyCode = 9       # VK_TAB
+        else: discard
+
+      if keyCode != 0:
+        # Emit CSI u: \e[<key>;<mods+1>;<action>u
+        outStr.add("\e[")
+        outStr.add($keyCode)
+        outStr.add(";")
+        outStr.add($(mods + 1))
+        outStr.add(";")
+        outStr.add($action)
+        outStr.add("u")
+
+  # Copy to caller buffer
+  let ncopy = min(outStr.len, buffer.len)
+  for i in 0 ..< ncopy:
+    buffer[i] = outStr[i]
+  return ncopy
 
 proc setupSignalHandlers*(handler: proc(sig: cint) {.noconv.}) =
   ## Set up signal handlers for graceful shutdown
