@@ -1,7 +1,16 @@
-# backstorie
-Core Nim-based engine for building terminal apps and games, with support for both native and WebAssembly targets.
+# Backstorie
+Nim-based engine for building terminal apps and games, with support for both native and WebAssembly targets.
 
-**Platform Support:** Linux ✅ | macOS ✅ | BSD ✅ | Windows (via WSL) ✅ | Browser (WASM) ✅ | Windows Native ⏳
+## Features
+
+- **Cross-Platform** - Runs natively in terminals and in web browsers via WebAssembly
+- **Modular Architecture** - Platform-specific code cleanly separated for easy maintenance
+- **Reusable Libraries** - Helper modules for events, animations, and UI components
+- **Input Handling** - Comprehensive keyboard, mouse, and special key support
+- **Color Support** - True color (24-bit), 256-color, and 8-color terminal support
+- **Layer System** - Z-ordered layers with transparency support
+- **Automatic Terminal Resize Handling** - All layers automatically resize when the terminal or browser window changes size
+- **Direct Callback Architecture** - Simple onInit/onUpdate/onRender callback system
 
 ## Quick Start
 
@@ -9,24 +18,24 @@ Core Nim-based engine for building terminal apps and games, with support for bot
 
 #### Using the Run Script (Recommended)
 
-The easiest way to run backstorie with different example files:
+With Nim installed, the easiest way to run backstorie with different example files:
 
 ```bash
-# Run the default index.nim
-./run.sh
+# Run using index.nim
+./build.sh
 
 # Run a specific example
-./run.sh example_boxes
-./run.sh example_simple_counter
+./build.sh events_core
+./build.sh events_advanced
 
 # Compile in release mode (optimized)
-./run.sh -r example_boxes
+./build.sh -r boxes
 
-# Compile only (don't run)
-./run.sh -c example_boxes
+# Compile only
+./build.sh -c boxes
 
 # Show help
-./run.sh --help
+./build.sh --help
 ```
 
 #### Direct Compilation
@@ -38,7 +47,7 @@ You can also compile directly with nim:
 nim c -r backstorie.nim
 
 # Compile and run with a specific file
-nim c -r -d:userFile=example_boxes backstorie.nim
+nim c -r -d:userFile=examples/boxes backstorie.nim
 
 # Show help
 nim c -r backstorie.nim --help
@@ -50,22 +59,22 @@ Compile your Backstorie apps to run in the browser:
 
 ```bash
 # Compile to WASM
-./compile_wasm.sh example_boxes
+./build-web.sh boxes
 
 # Compile and serve locally
-./compile_wasm.sh -s example_boxes
+./build-web.sh -s boxes
 
 # Deploy to GitHub Pages
-./compile_wasm.sh -o docs -r example_boxes
+./build-web.sh -o docs -r boxes
 ```
 
 See detailed guides:
-- [WASM_GUIDE.md](WASM_GUIDE.md) - Compilation and deployment
-- [GITHUB_PAGES.md](GITHUB_PAGES.md) - Deploy to GitHub Pages
+- [WASM_GUIDE.md](docs/WASM_GUIDE.md) - Compilation and deployment
+- [GITHUB_PAGES.md](docs/GITHUB_PAGES.md) - Deploy to GitHub Pages
 
 ## Creating Your Own App
 
-1. Create a `.nim` file (e.g., `myapp.nim`)
+1. Simply edit index.nim. Or create a `.nim` file (e.g., `myapp.nim`)
 2. Optionally import helper libraries and define callbacks:
 
 ```nim
@@ -105,7 +114,7 @@ onShutdown = proc(state: AppState) =
 3. Run it:
 
 ```bash
-./run.sh myapp
+./build.sh myapp
 ```
 
 or compile directly:
@@ -114,16 +123,13 @@ or compile directly:
 nim c -r -d:userFile=myapp backstorie.nim
 ```
 
-## Available Examples
+## Helpful Examples
 
 - `index.nim` - Default simple demo
-- `example_boxes.nim` - Animated bouncing boxes with layers
-- `example_counter.nim` - Basic frame counter
-- `example_fadein.nim` - Fade-in animation example
-- `example_particles.nim` - Particle system demo
-- `example_core_events.nim` - Core event handling demo
-- `example_advanced_events.nim` - Advanced event system usage
-- `example_wasm_test.nim` - WASM/browser compatibility test
+- [examples/boxes.nim](https://github.com/maddestlabs/Backstorie/blob/main/examples/boxes.nim) - Animated bouncing boxes with layers
+- [examples/counter.nim](https://github.com/maddestlabs/Backstorie/blob/main/examples/counter.nim) - Basic frame counter
+- [examples/events_core.nim](https://github.com/maddestlabs/Backstorie/blob/main/examples/events_core.nim) - Core event handling demo
+- [examples/events_advanced.nim](https://github.com/maddestlabs/Backstorie/blob/main/examples/events_advanced.nim) - More complex event system usage
 
 ## Helper Libraries
 
@@ -136,23 +142,11 @@ See [LIBRARY_GUIDE.md](LIBRARY_GUIDE.md) for detailed usage instructions and exa
 ## Engine Internals
 
 - `src/platform/terminal.nim` - Platform dispatcher for terminal operations
-- `src/platform/posix_impl.nim` - POSIX implementation (Linux, macOS, BSD)
-- `src/platform/windows_impl.nim` - Windows implementation (planned)
-
-## Features
-
-- **Cross-Platform** - Runs natively in terminals and in web browsers via WebAssembly
-- **Modular Architecture** - Platform-specific code cleanly separated for easy maintenance
-- **Automatic Terminal Resize Handling** - All layers automatically resize when the terminal or browser window changes size
-- **Direct Callback Architecture** - Simple onInit/onUpdate/onRender callback system
-- **Reusable Libraries** - Helper modules for events, animations, and UI components
-- **Layer System** - Z-ordered layers with transparency support
-- **Input Handling** - Comprehensive keyboard, mouse, and special key support
-- **Color Support** - True color (24-bit), 256-color, and 8-color terminal support
-- **Canvas Rendering** - Hardware-accelerated rendering in browser via HTML5 canvas
+- `src/platform/platform_posix.nim` - POSIX implementation (Linux, macOS, BSD)
+- `src/platform/platform_win.nim` - Windows implementation
 
 ## Platform Notes
 
 - **Linux/macOS/BSD**: Native POSIX support with optimized terminal operations
-- **Windows**: Use WSL for best experience, or see [WINDOWS_SUPPORT.md](docs/WINDOWS_SUPPORT.md) for native Windows implementation guide
+- **Windows**: Performance struggles a bit on Windows natively. WSL provides a speedier experience.
 - **Browser**: Full WebAssembly support with canvas rendering (works on all platforms)
