@@ -26,9 +26,9 @@ Windows support was initially removed due to:
 ### Current Structure (After Refactoring)
 
 ```
-lib/terminal.nim              # Platform-agnostic interface (dispatcher)
-├── lib/terminal_posix.nim    # POSIX implementation (Linux, macOS, BSD)
-└── lib/terminal_windows.nim  # Windows implementation (TODO)
+src/platform/terminal.nim        # Platform-agnostic interface (dispatcher)
+├── src/platform/posix_impl.nim  # POSIX implementation (Linux, macOS, BSD)
+└── src/platform/windows_impl.nim # Windows implementation (TODO)
 ```
 
 The main `backstorie.nim` file now imports `lib/terminal.nim` which automatically selects the correct platform implementation.
@@ -43,7 +43,7 @@ The main `backstorie.nim` file now imports `lib/terminal.nim` which automaticall
 
 ### Phase 2: Windows Console API Wrapper (Estimated: 1-2 days)
 
-Create `lib/terminal_windows.nim` with Windows Console API wrappers:
+Create `src/platform/windows_impl.nim` with Windows Console API wrappers:
 
 #### Required Windows API Functions
 
@@ -258,7 +258,7 @@ Given the alternatives, here's the suggested priority:
 
 If you decide to proceed with native Windows support:
 
-1. Create `lib/terminal_windows.nim` stub
+1. Create `src/platform/windows_impl.nim` stub
 2. Implement basic console mode setup/restore
 3. Test with a simple "Hello Windows" example
 4. Gradually add input reading

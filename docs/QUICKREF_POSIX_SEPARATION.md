@@ -6,8 +6,8 @@ The POSIX-specific terminal code has been successfully separated into platform-s
 
 ## New Files
 
-1. **`lib/terminal_posix.nim`** - All POSIX terminal operations (Linux, macOS, BSD)
-2. **`lib/terminal.nim`** - Platform dispatcher (selects POSIX, Windows, or WASM)
+1. **`src/platform/posix_impl.nim`** - All POSIX terminal operations (Linux, macOS, BSD)
+2. **`src/platform/terminal.nim`** - Platform dispatcher (selects POSIX, Windows, or WASM)
 3. **`docs/WINDOWS_SUPPORT.md`** - Comprehensive Windows implementation guide
 4. **`docs/POSIX_SEPARATION.md`** - Detailed summary of changes
 
@@ -19,7 +19,7 @@ The POSIX-specific terminal code has been successfully separated into platform-s
 - ✅ Cleaner code organization
 - ⏳ Windows native support (ready to implement when needed)
 
-## Key Functions in `lib/terminal_posix.nim`
+## Key Functions in `src/platform/posix_impl.nim`
 
 ```nim
 proc setupRawMode*(): TerminalState
@@ -38,9 +38,9 @@ proc setupSignalHandlers*(handler: proc(sig: cint) {.noconv.})
 
 ## How to Add Windows Support
 
-### Step 1: Create `lib/terminal_windows.nim`
+### Step 1: Create `src/platform/windows_impl.nim`
 
-Implement the same interface as `terminal_posix.nim` using Windows Console API:
+Implement the same interface as `posix_impl.nim` using Windows Console API:
 
 ```nim
 # Import Windows API
@@ -63,7 +63,7 @@ proc readInputRaw*(buffer: var openArray[char]): int =
 # ... etc
 ```
 
-### Step 2: Update `lib/terminal.nim`
+### Step 2: Update `src/platform/terminal.nim`
 
 Change this:
 ```nim
@@ -74,8 +74,8 @@ when defined(windows):
 To this:
 ```nim
 when defined(windows):
-  import terminal_windows
-  export terminal_windows
+  import windows_impl
+  export windows_impl
 ```
 
 ### Step 3: Test on Windows

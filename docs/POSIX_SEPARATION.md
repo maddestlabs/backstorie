@@ -6,7 +6,7 @@ Successfully separated POSIX-specific terminal code from the main engine, making
 
 ## Changes Made
 
-### 1. New Module: `lib/terminal_posix.nim`
+### 1. New Module: `src/platform/posix_impl.nim`
 Contains all POSIX-specific terminal operations:
 - Raw terminal mode setup/restore
 - Terminal size detection
@@ -16,11 +16,11 @@ Contains all POSIX-specific terminal operations:
 - Mouse reporting
 - Keyboard protocol modes
 
-### 2. New Module: `lib/terminal.nim`
+### 2. New Module: `src/platform/terminal.nim`
 Platform-agnostic interface that:
 - Automatically imports the correct platform module
 - Provides WASM stubs (no-ops for browser)
-- Will dispatch to `terminal_windows.nim` when implemented
+- Will dispatch to `windows_impl.nim` when implemented
 - Shows clear error for Windows until implementation is ready
 
 ### 3. Refactored: `backstorie.nim`
@@ -74,10 +74,15 @@ Now that POSIX code is separated, implementing Windows support is much cleaner:
 ```
 backstorie/
 ├── backstorie.nim              # Main engine (platform-agnostic)
-├── lib/
-│   ├── terminal.nim           # Platform dispatcher
-│   ├── terminal_posix.nim     # POSIX implementation ✅
-│   └── terminal_windows.nim   # Windows implementation (TODO)
+├── src/
+│   └── platform/
+│       ├── terminal.nim       # Platform dispatcher
+│       ├── posix_impl.nim     # POSIX implementation ✅
+│       └── windows_impl.nim   # Windows implementation (TODO)
+├── lib/                        # User-facing helper libraries
+│   ├── events.nim
+│   ├── animation.nim
+│   └── ui_components.nim
 └── docs/
     └── WINDOWS_SUPPORT.md     # Implementation guide
 ```

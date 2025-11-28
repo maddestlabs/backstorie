@@ -4,12 +4,12 @@
 
 when not defined(emscripten):
   when defined(windows):
-    # TODO: import lib/terminal_windows
+    # TODO: import platform/platform_windows
     {.error: "Windows support not yet implemented. Use WSL or compile for WASM target.".}
   else:
     # POSIX systems (Linux, macOS, BSD, etc.)
-    import terminal_posix
-    export terminal_posix
+    import platform_posix
+    export platform_posix
 else:
   # WebAssembly target - no terminal operations needed
   type

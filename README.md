@@ -130,10 +130,14 @@ nim c -r -d:userFile=myapp backstorie.nim
 - `lib/events.nim` - Robust event handling with callbacks
 - `lib/animation.nim` - Easing functions, interpolation, particles
 - `lib/ui_components.nim` - Reusable UI elements (boxes, buttons, progress bars)
-- `lib/terminal.nim` - Platform-agnostic terminal operations
-- `lib/terminal_posix.nim` - POSIX implementation (Linux, macOS, BSD)
 
 See [LIBRARY_GUIDE.md](LIBRARY_GUIDE.md) for detailed usage instructions and examples.
+
+## Engine Internals
+
+- `src/platform/terminal.nim` - Platform dispatcher for terminal operations
+- `src/platform/posix_impl.nim` - POSIX implementation (Linux, macOS, BSD)
+- `src/platform/windows_impl.nim` - Windows implementation (planned)
 
 ## Features
 

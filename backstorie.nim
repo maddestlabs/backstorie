@@ -2,7 +2,7 @@ import strutils, times, parseopt, os, tables, math
 import macros
 
 when not defined(emscripten):
-  import lib/terminal
+  import src/platform/terminal
 
 const version = "0.1.0"
 
