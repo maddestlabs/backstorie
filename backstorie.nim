@@ -2,7 +2,7 @@ import strutils, times, parseopt, os, tables, math
 import macros
 
 when not defined(emscripten):
-  import posix, termios
+  import lib/terminal
 
 const version = "0.1.0"
 
@@ -597,8 +597,8 @@ type
     lastMouseX*, lastMouseY*: int
 
 when not defined(emscripten):
-  var oldTermios: Termios
   var globalRunning {.global.} = true
+  var globalTerminalState: TerminalState
 
 # ================================================================
 # COLOR UTILITIES
@@ -637,77 +637,14 @@ proc detectColorSupport(): int =
       return 8
     return 0
 
-proc setupRawMode() =
-  when not defined(emscripten):
-    discard tcGetAttr(STDIN_FILENO, addr oldTermios)
-    var raw = oldTermios
-    raw.c_lflag = raw.c_lflag and not(ECHO or ICANON or IEXTEN)
-    raw.c_iflag = raw.c_iflag and not(IXON or ICRNL or BRKINT or INPCK or ISTRIP)
-    raw.c_oflag = raw.c_oflag and not(OPOST)
-    raw.c_cc[VMIN] = 0.char
-    raw.c_cc[VTIME] = 0.char
-    discard tcSetAttr(STDIN_FILENO, TCSAFLUSH, addr raw)
-
-proc restoreTerminal() =
-  when not defined(emscripten):
-    discard tcSetAttr(STDIN_FILENO, TCSAFLUSH, addr oldTermios)
-    stdout.write("\e[2J\e[H\e[?25h\e[0m")
-    stdout.flushFile()
-    stdout.write("\n")
-    stdout.flushFile()
-
-proc hideCursor() =
-  when not defined(emscripten):
-    stdout.write("\e[?25l")
-    stdout.flushFile()
-
-proc enableMouseReporting() =
-  when not defined(emscripten):
-    stdout.write("\e[?1006h\e[?1000h")
-    stdout.flushFile()
-
-proc disableMouseReporting() =
-  when not defined(emscripten):
-    stdout.write("\e[?1006l\e[?1000l")
-    stdout.flushFile()
-
-proc enableKeyboardProtocol() =
-  when not defined(emscripten):
-    # Enable enhanced keyboard protocol (CSI u mode)
-    # This allows proper detection of key presses with modifiers
-    stdout.write("\e[>1u")
-    stdout.flushFile()
-
-proc disableKeyboardProtocol() =
-  when not defined(emscripten):
-    # Disable enhanced keyboard protocol
-    stdout.write("\e[<u")
-    stdout.flushFile()
-
-proc getTermSize(): (int, int) =
-  when defined(emscripten):
-    return (80, 24)
-  else:
-    var ws: IOctl_WinSize
-    if ioctl(STDOUT_FILENO, TIOCGWINSZ, addr ws) != -1:
-      return (ws.ws_col.int, ws.ws_row.int)
-    return (80, 24)
-
 proc getInputEvent*(state: AppState): seq[InputEvent] =
   when defined(emscripten):
     return @[]
   else:
-    var fds: TFdSet
-    FD_ZERO(fds)
-    FD_SET(STDIN_FILENO, fds)
-    var tv = Timeval(tv_sec: posix.Time(0), tv_usec: 0)
-    
     var buffer: array[256, char]
-    if select(STDIN_FILENO + 1, addr fds, nil, nil, addr tv) > 0:
-      let bytesRead = read(STDIN_FILENO, addr buffer[0], 256)
-      if bytesRead > 0:
-        return state.inputParser.parseInput(buffer.toOpenArray(0, bytesRead - 1))
-    
+    let bytesRead = readInputRaw(buffer)
+    if bytesRead > 0:
+      return state.inputParser.parseInput(buffer.toOpenArray(0, bytesRead - 1))
     return @[]
 
 # ================================================================
@@ -1277,13 +1214,12 @@ proc main() =
     state.inputParser = newTerminalInputParser()
     state.targetFps = 60.0
     
-    setupRawMode()
+    globalTerminalState = setupRawMode()
     hideCursor()
     enableMouseReporting()
     enableKeyboardProtocol()
     
-    signal(SIGINT, proc(sig: cint) {.noconv.} = globalRunning = false)
-    signal(SIGTERM, proc(sig: cint) {.noconv.} = globalRunning = false)
+    setupSignalHandlers(proc(sig: cint) {.noconv.} = globalRunning = false)
     
     let (w, h) = getTermSize()
     state.termWidth = w
@@ -1357,7 +1293,11 @@ proc main() =
       callOnShutdown(state)
       disableKeyboardProtocol()
       disableMouseReporting()
-      restoreTerminal()
+      showCursor()
+      clearScreen()
+      restoreTerminal(globalTerminalState)
+      stdout.write("\n")
+      stdout.flushFile()
 
 when isMainModule:
   main()

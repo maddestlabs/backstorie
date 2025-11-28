@@ -1,6 +1,8 @@
 # backstorie
 Core Nim-based engine for building terminal apps and games, with support for both native and WebAssembly targets.
 
+**Platform Support:** Linux ✅ | macOS ✅ | BSD ✅ | Windows (via WSL) ✅ | Browser (WASM) ✅ | Windows Native ⏳
+
 ## Quick Start
 
 ### Native Terminal Apps
@@ -128,12 +130,15 @@ nim c -r -d:userFile=myapp backstorie.nim
 - `lib/events.nim` - Robust event handling with callbacks
 - `lib/animation.nim` - Easing functions, interpolation, particles
 - `lib/ui_components.nim` - Reusable UI elements (boxes, buttons, progress bars)
+- `lib/terminal.nim` - Platform-agnostic terminal operations
+- `lib/terminal_posix.nim` - POSIX implementation (Linux, macOS, BSD)
 
 See [LIBRARY_GUIDE.md](LIBRARY_GUIDE.md) for detailed usage instructions and examples.
 
 ## Features
 
 - **Cross-Platform** - Runs natively in terminals and in web browsers via WebAssembly
+- **Modular Architecture** - Platform-specific code cleanly separated for easy maintenance
 - **Automatic Terminal Resize Handling** - All layers automatically resize when the terminal or browser window changes size
 - **Direct Callback Architecture** - Simple onInit/onUpdate/onRender callback system
 - **Reusable Libraries** - Helper modules for events, animations, and UI components
@@ -141,3 +146,9 @@ See [LIBRARY_GUIDE.md](LIBRARY_GUIDE.md) for detailed usage instructions and exa
 - **Input Handling** - Comprehensive keyboard, mouse, and special key support
 - **Color Support** - True color (24-bit), 256-color, and 8-color terminal support
 - **Canvas Rendering** - Hardware-accelerated rendering in browser via HTML5 canvas
+
+## Platform Notes
+
+- **Linux/macOS/BSD**: Native POSIX support with optimized terminal operations
+- **Windows**: Use WSL for best experience, or see [WINDOWS_SUPPORT.md](docs/WINDOWS_SUPPORT.md) for native Windows implementation guide
+- **Browser**: Full WebAssembly support with canvas rendering (works on all platforms)
