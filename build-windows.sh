@@ -29,9 +29,21 @@ if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
     # Native Windows
     nim c -d:release -d:userFile="$USERFILE" --out:backstorie.exe backstorie.nim
 else
-    # Cross-compile from Linux/Mac
+    # Cross-compile from Linux/Mac using MinGW
     echo "Cross-compiling for Windows..."
-    nim c -d:mingw -d:release -d:userFile="$USERFILE" --cpu:amd64 --os:windows --out:backstorie.exe backstorie.nim
+    
+    # Check if MinGW is installed
+    if ! command -v x86_64-w64-mingw32-gcc &> /dev/null; then
+        echo "ERROR: MinGW-w64 not found!"
+        echo "Install with: sudo apt-get install mingw-w64"
+        exit 1
+    fi
+    
+    nim c --os:windows --cpu:amd64 \
+        --gcc.exe:x86_64-w64-mingw32-gcc \
+        --gcc.linkerexe:x86_64-w64-mingw32-gcc \
+        -d:release -d:userFile="$USERFILE" \
+        --out:backstorie.exe backstorie.nim
 fi
 
 if [ $? -eq 0 ]; then
