@@ -19,14 +19,17 @@ Options:
   -v, --version         Show version information
   -r, --release         Compile in release mode (optimized)
   -s, --serve           Start a local web server after compilation
+  -o, --output DIR      Output directory (default: web)
 
 Examples:
   ./compile_wasm.sh                          # Compile index.nim to WASM
   ./compile_wasm.sh example_boxes            # Compile example_boxes.nim to WASM
   ./compile_wasm.sh -r example_boxes         # Compile optimized
   ./compile_wasm.sh -s                       # Compile and serve
+  ./compile_wasm.sh -o docs                  # Output to docs/ (for GitHub Pages)
+  ./compile_wasm.sh -o .                     # Output to root directory
 
-The compiled files will be placed in the web/ directory.
+The compiled files will be placed in the specified output directory.
 
 Requirements:
   - Nim compiler with Emscripten support
@@ -45,6 +48,7 @@ EOF
 RELEASE_MODE=""
 SERVE=false
 USER_FILE=""
+OUTPUT_DIR="web"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -64,6 +68,15 @@ while [[ $# -gt 0 ]]; do
         -s|--serve)
             SERVE=true
             shift
+            ;;
+        -o|--output)
+            if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
+                OUTPUT_DIR="$2"
+                shift 2
+            else
+                echo "Error: --output requires a directory argument"
+                exit 1
+            fi
             ;;
         -*)
             echo "Unknown option: $1"
@@ -119,10 +132,11 @@ if [ ! -f "${FILE_BASE}.nim" ]; then
     fi
 fi
 
-# Create web directory if it doesn't exist
-mkdir -p web
+# Create output directory if it doesn't exist
+mkdir -p "$OUTPUT_DIR"
 
 echo "Compiling Backstorie to WASM with ${FILE_BASE}.nim..."
+echo "Output directory: $OUTPUT_DIR"
 echo ""
 
 # Nim compiler options for Emscripten
@@ -138,7 +152,7 @@ NIM_OPTS="c
   -d:userFile=$FILE_BASE
   $RELEASE_MODE
   --nimcache:nimcache_wasm
-  -o:web/backstorie.wasm.js
+  -o:$OUTPUT_DIR/backstorie.wasm.js
   backstorie.nim"
 
 # Emscripten flags
@@ -164,23 +178,41 @@ echo ""
 echo "✓ Compilation successful!"
 echo ""
 echo "Output files:"
-echo "  - web/backstorie.wasm.js"
-echo "  - web/backstorie.wasm"
-echo "  - web/backstorie.js (JavaScript interface)"
-echo "  - web/index.html (HTML template)"
+echo "  - $OUTPUT_DIR/backstorie.wasm.js"
+echo "  - $OUTPUT_DIR/backstorie.wasm"
 echo ""
 
-# Copy supporting files if they don't exist
-if [ ! -f "web/backstorie.js" ]; then
-    echo "Warning: web/backstorie.js not found. Make sure to create the JavaScript interface."
+# Copy supporting files from web/ template if they exist and output is different
+if [ "$OUTPUT_DIR" != "web" ]; then
+    if [ -f "web/backstorie.js" ]; then
+        cp web/backstorie.js "$OUTPUT_DIR/backstorie.js"
+        echo "  - $OUTPUT_DIR/backstorie.js (copied from web/)"
+    fi
+    if [ -f "web/index.html" ]; then
+        cp web/index.html "$OUTPUT_DIR/index.html"
+        echo "  - $OUTPUT_DIR/index.html (copied from web/)"
+    fi
+else
+    echo "  - $OUTPUT_DIR/backstorie.js (JavaScript interface)"
+    echo "  - $OUTPUT_DIR/index.html (HTML template)"
 fi
 
-if [ ! -f "web/index.html" ]; then
-    echo "Warning: web/index.html not found. Make sure to create the HTML template."
+# Check for required supporting files
+if [ ! -f "$OUTPUT_DIR/backstorie.js" ]; then
+    echo ""
+    echo "Warning: $OUTPUT_DIR/backstorie.js not found."
+    echo "         Copy web/backstorie.js to $OUTPUT_DIR/ or create the JavaScript interface."
+fi
+
+if [ ! -f "$OUTPUT_DIR/index.html" ]; then
+    echo ""
+    echo "Warning: $OUTPUT_DIR/index.html not found."
+    echo "         Copy web/index.html to $OUTPUT_DIR/ or create the HTML template."
 fi
 
 # Start web server if requested
 if [ "$SERVE" = true ]; then
+    echo ""
     echo "Starting local web server..."
     echo "Open http://localhost:8000 in your browser"
     echo "Press Ctrl+C to stop"
@@ -188,18 +220,19 @@ if [ "$SERVE" = true ]; then
     
     # Try different server options
     if command -v python3 &> /dev/null; then
-        cd web && python3 -m http.server 8000
+        cd "$OUTPUT_DIR" && python3 -m http.server 8000
     elif command -v python &> /dev/null; then
-        cd web && python -m SimpleHTTPServer 8000
+        cd "$OUTPUT_DIR" && python -m SimpleHTTPServer 8000
     elif command -v php &> /dev/null; then
-        cd web && php -S localhost:8000
+        cd "$OUTPUT_DIR" && php -S localhost:8000
     else
         echo "Error: No web server available (tried python3, python, php)"
-        echo "Please install Python or PHP, or serve the web/ directory manually."
+        echo "Please install Python or PHP, or serve the $OUTPUT_DIR/ directory manually."
         exit 1
     fi
 else
+    echo ""
     echo "To test the build:"
-    echo "  cd web && python3 -m http.server 8000"
+    echo "  cd $OUTPUT_DIR && python3 -m http.server 8000"
     echo "  Then open http://localhost:8000 in your browser"
 fi

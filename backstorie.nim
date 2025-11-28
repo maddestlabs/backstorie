@@ -137,9 +137,9 @@ const
   INTERMED_MAX = 16
   CSI_ARGS_MAX = 16
   CSI_LEADER_MAX = 16
-  CSI_ARG_FLAG_MORE* = int(0x80000000'u32)
-  CSI_ARG_MASK* = int(0x7FFFFFFF'u32)
-  CSI_ARG_MISSING* = int(0x7FFFFFFF'u32)
+  CSI_ARG_FLAG_MORE* = 0x80000000'i64
+  CSI_ARG_MASK* = 0x7FFFFFFF'i64
+  CSI_ARG_MISSING* = 0x7FFFFFFF'i64
 
 type
   StringCsiState = object
@@ -181,9 +181,9 @@ proc newTerminalInputParser*(): TerminalInputParser =
   result.escapeTimeout = 300
   result.escTimer = epochTime()
 
-proc csiArg(a: int64): int = int(a) and CSI_ARG_MASK
-proc csiArgHasMore(a: int64): bool = (int(a) and CSI_ARG_FLAG_MORE) != 0
-proc csiArgIsMissing(a: int64): bool = csiArg(a) == CSI_ARG_MISSING
+proc csiArg(a: int64): int = int(a and CSI_ARG_MASK)
+proc csiArgHasMore(a: int64): bool = (a and CSI_ARG_FLAG_MORE) != 0
+proc csiArgIsMissing(a: int64): bool = (a and CSI_ARG_MASK) == CSI_ARG_MISSING
 
 proc csiArgOr(a: int64, def: int): int =
   if csiArgIsMissing(a): def else: csiArg(a)

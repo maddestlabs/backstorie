@@ -38,6 +38,10 @@ source ./emsdk_env.sh
 
 # Compile and start a local web server
 ./compile_wasm.sh -s
+
+# Compile to a different directory (e.g., for GitHub Pages)
+./compile_wasm.sh -o docs example_boxes
+./compile_wasm.sh -o . example_boxes  # Output to root directory
 ```
 
 ### Output
@@ -72,7 +76,23 @@ The web version includes:
 
 ## Deployment
 
-To deploy your Backstorie application:
+### GitHub Pages
+
+The easiest deployment option! See [GITHUB_PAGES.md](GITHUB_PAGES.md) for detailed instructions.
+
+Quick setup:
+```bash
+./compile_wasm.sh -o docs -r your_app
+git add docs/
+git commit -m "Deploy to GitHub Pages"
+git push
+```
+
+Then configure GitHub Pages to serve from the `/docs` directory.
+
+### Custom Web Server
+
+To deploy to your own web server:
 
 1. Compile in release mode for optimization:
    ```bash

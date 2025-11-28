@@ -52,13 +52,14 @@ Compile your Backstorie apps to run in the browser:
 
 # Compile and serve locally
 ./compile_wasm.sh -s example_boxes
+
+# Deploy to GitHub Pages
+./compile_wasm.sh -o docs -r example_boxes
 ```
 
-See [WASM_GUIDE.md](WASM_GUIDE.md) for detailed instructions on:
-- Setting up Emscripten
-- Compiling to WebAssembly
-- Deploying to web servers
-- Browser-specific features and limitations
+See detailed guides:
+- [WASM_GUIDE.md](WASM_GUIDE.md) - Compilation and deployment
+- [GITHUB_PAGES.md](GITHUB_PAGES.md) - Deploy to GitHub Pages
 
 ## Creating Your Own App
 
