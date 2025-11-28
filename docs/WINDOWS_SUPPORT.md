@@ -2,9 +2,48 @@
 
 ## Current Status
 
-As of the latest refactoring, the POSIX-specific terminal code has been separated into `lib/terminal_posix.nim`, making it much easier to add Windows support alongside the existing Unix support.
+As of the latest update, minimal Windows support has been implemented!
 
-**Status:** POSIX code separated ✅ | Windows implementation pending ⏳
+**Status:** POSIX code separated ✅ | Minimal Windows implementation complete ✅ | Full Windows support in progress ⏳
+
+### What Works Now
+
+- ✅ Basic terminal setup with ANSI escape sequence support
+- ✅ Terminal size detection
+- ✅ Screen clearing and cursor control
+- ✅ Color output (RGB, 256-color, basic 8-color)
+- ✅ Basic rendering to Windows console
+- ✅ Graceful cleanup on exit
+
+### What's Limited
+
+- ⚠️ Input handling is basic (simple stdin reading)
+- ⚠️ Mouse events may not work perfectly
+- ⚠️ Keyboard protocol support is experimental
+- ⚠️ Signal handling is minimal (Ctrl+C uses default handler)
+- ⚠️ Best results require Windows Terminal (legacy CMD has limitations)
+
+### Quick Start
+
+**Requirements:**
+- Windows 10 or later (for ANSI support)
+- Windows Terminal recommended (better performance and compatibility)
+- Nim compiler installed
+
+**Build and run:**
+```batch
+REM Using the build script
+build-windows.bat examples\windows_test
+
+REM Then run
+backstorie.exe
+```
+
+**Or compile directly:**
+```batch
+nim c -d:release -d:userFile=examples\windows_test backstorie.nim
+backstorie.exe
+```
 
 ## Why Windows Support Was Removed
 
@@ -254,16 +293,97 @@ Given the alternatives, here's the suggested priority:
    - Easy solution for Windows users
    - Current POSIX code works perfectly
 
+## Testing the Windows Implementation
+
+### Quick Verification Test
+
+We've included a minimal test example specifically for Windows:
+
+```batch
+REM Build the Windows test
+build-windows.bat examples\windows_test
+
+REM Run it
+backstorie.exe
+```
+
+This test will verify:
+- ✓ Terminal initialization works
+- ✓ Screen clearing works
+- ✓ Text rendering works
+- ✓ Colors display correctly
+- ✓ Terminal size detection works
+- ✓ FPS counter updates
+- ✓ Input handling (Q/ESC to quit) works
+
+### Testing in Different Terminals
+
+**Windows Terminal (Recommended):**
+```batch
+wt backstorie.exe
+```
+- Full ANSI support
+- Best performance
+- RGB colors work perfectly
+
+**PowerShell:**
+```powershell
+.\backstorie.exe
+```
+- Good ANSI support in PowerShell 7+
+- Works well with the implementation
+
+**Command Prompt (CMD):**
+```batch
+backstorie.exe
+```
+- Limited support in legacy CMD
+- May have visual artifacts
+- Use Windows Terminal instead
+
+### Known Issues
+
+1. **Input Latency:** The current `readInputRaw()` implementation is basic and may have some latency. This will be improved in future updates.
+
+2. **Mouse Support:** Mouse events are enabled but may not work perfectly in all scenarios. This requires more sophisticated input handling.
+
+3. **Resize Events:** Terminal resize detection works via polling `getTermSize()`, but doesn't catch resize events directly yet.
+
 ## Getting Started with Windows Implementation
 
-If you decide to proceed with native Windows support:
+Basic Windows support is now implemented! Here's what was done:
 
-1. Create `src/platform/windows_impl.nim` stub
-2. Implement basic console mode setup/restore
-3. Test with a simple "Hello Windows" example
-4. Gradually add input reading
-5. Test extensively in Windows Terminal
-6. Optimize based on profiling
+1. ✅ Created `src/platform/platform_win.nim` with Windows Console API wrappers
+2. ✅ Implemented basic console mode setup/restore
+3. ✅ Added terminal size detection
+4. ✅ Created Windows build scripts
+5. ✅ Added minimal test example (`examples/windows_test.nim`)
+6. ✅ Updated dispatcher in `src/platform/terminal.nim`
+
+### Next Steps for Full Support
+
+To expand Windows support further:
+
+1. **Improve Input Handling:**
+   - Implement proper `ReadConsoleInput()` based reading
+   - Convert `INPUT_RECORD` structures properly
+   - Add better keyboard event handling
+   - Implement mouse event conversion
+
+2. **Add Signal Handling:**
+   - Implement `SetConsoleCtrlHandler()`
+   - Handle CTRL_C_EVENT gracefully
+   - Handle CTRL_CLOSE_EVENT
+
+3. **Performance Optimization:**
+   - Profile in Windows Terminal
+   - Optimize screen updates if needed
+   - Consider console buffer direct writes for speed
+
+4. **Testing:**
+   - Test all examples on Windows
+   - Verify in different terminal emulators
+   - Document any platform-specific quirks
 
 The refactored code structure makes this much more manageable than before!
 

@@ -4,8 +4,9 @@
 
 when not defined(emscripten):
   when defined(windows):
-    # TODO: import platform/platform_windows
-    {.error: "Windows support not yet implemented. Use WSL or compile for WASM target.".}
+    # Windows systems (Windows 10+ recommended for best ANSI support)
+    import platform_win
+    export platform_win
   else:
     # POSIX systems (Linux, macOS, BSD, etc.)
     import platform_posix
