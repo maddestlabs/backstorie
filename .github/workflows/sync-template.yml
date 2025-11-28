@@ -2,12 +2,10 @@ name: Sync from Backstorie Template
 
 # This workflow syncs updates from the Backstorie template repository.
 # - In the Backstorie repo itself: Does nothing (or can sync from your upstream if you fork it)
-# - In repos created from template: Automatically pulls updates from maddestlabs/backstorie
+# - In repos created from template: Available to manually pull updates from maddestlabs/backstorie
 
 on:
-  schedule:
-    - cron: '0 0 * * 0'  # Weekly on Sunday at midnight UTC
-  workflow_dispatch:      # Allow manual triggering
+  workflow_dispatch:      # Manual triggering only
 
 jobs:
   sync:
@@ -114,9 +112,9 @@ jobs:
             
             ---
             
-            🤖 This PR was automatically created by GitHub Actions.
+            🤖 This PR was created by a manually-triggered GitHub Actions workflow.
             
-            To disable these automatic syncs, delete or disable `.github/workflows/sync-template.yml`
+            To disable this workflow entirely, delete or disable `.github/workflows/sync-template.yml`
           labels: |
             dependencies
             automated

@@ -1,18 +1,10 @@
 name: Build Nim Projects
 
 on:
-  push:
-    paths:
-      - '**.nim'
-      - 'build-web.sh'
-      - 'build.sh'
-    branches:
-      - main
-  pull_request:
-    paths:
-      - '**.nim'
-      - 'build-web.sh'
-      - 'build.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
