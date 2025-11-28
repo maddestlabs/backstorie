@@ -150,6 +150,9 @@ NIM_OPTS="c
   --clang.cpp.linkerexe:emcc
   -d:emscripten
   -d:userFile=$FILE_BASE
+  -d:noSignalHandler
+  --threads:off
+  --exceptions:goto
   $RELEASE_MODE
   --nimcache:nimcache_wasm
   -o:$OUTPUT_DIR/backstorie.wasm.js
@@ -157,12 +160,15 @@ NIM_OPTS="c
 
 # Emscripten flags
 export EMCC_CFLAGS="-s ALLOW_MEMORY_GROWTH=1 \
-  -s EXPORTED_FUNCTIONS=['_malloc','_free'] \
+  -s EXPORTED_FUNCTIONS=['_malloc','_free','_emInit','_emUpdate','_emResize','_emGetCell','_emGetCellFgR','_emGetCellFgG','_emGetCellFgB','_emGetCellBgR','_emGetCellBgG','_emGetCellBgB','_emGetCellBold','_emGetCellItalic','_emGetCellUnderline','_emHandleKeyPress','_emHandleTextInput','_emHandleMouseClick','_emHandleMouseMove'] \
   -s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','allocateUTF8','UTF8ToString'] \
   -s MODULARIZE=0 \
   -s EXPORT_NAME='Module' \
   -s ENVIRONMENT=web \
-  -s INITIAL_MEMORY=16777216"
+  -s INITIAL_MEMORY=33554432 \
+  -s STACK_SIZE=5242880 \
+  -s ASSERTIONS=0 \
+  -s STACK_OVERFLOW_CHECK=0"
 
 # Compile
 echo "Running Nim compiler..."
